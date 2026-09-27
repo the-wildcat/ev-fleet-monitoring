@@ -1,0 +1,396 @@
+<!-- <!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Predict Battery Health</title>
+    <style>
+        /* General styles */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #e8f5e9;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* Container for the form */
+        .container {
+            background: #ffffff;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            padding: 20px;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+        }
+
+        h1 {
+            color: green;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-weight: bold;
+            margin: 10px 0 5px;
+            text-align: left;
+        }
+
+        input[type="number"] {
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: #43a047;
+            color: white;
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: darkgreen;
+        }
+
+        /* Results section */
+        .results {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e9f7ff;
+            border: 1px solid #bde4ff;
+            border-radius: 5px;
+            text-align: left;
+        }
+
+        .results h2 {
+            margin: 10px 0;
+            font-size: 18px;
+            color: #333;
+        }
+
+        .error {
+            color: #d8000c;
+            background-color: #ffbaba;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            text-align: center;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 600px) {
+            .container {
+                padding: 15px;
+            }
+
+            h1 {
+                font-size: 20px;
+            }
+
+            button {
+                font-size: 14px;
+            }
+        }
+
+        .action-buttons {
+            display: flex;
+            justify-content: center;
+            /* Center horizontally */
+            margin-top: 30px;
+            /* Reset margin to avoid offset */
+        }
+
+
+        .action-buttons button {
+            background-color: #43a047;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 1em;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease;
+        }
+
+        .action-buttons button:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+
+<body>
+    <div>
+        <div class="container">
+            <h1>Battery Health Prediction</h1>
+            <form method="POST">
+                <label for="capacity">Battery Capacity (mAh):</label>
+                <input type="number" step="0.01" id="capacity" name="capacity" required>
+
+                <label for="cycle_count">Cycle Count:</label>
+                <input type="number" id="cycle_count" name="cycle_count" required>
+
+                <label for="voltage">Voltage (V):</label>
+                <input type="number" step="0.01" id="voltage" name="voltage" required>
+
+                <label for="temperature">Temperature (°C):</label>
+                <input type="number" step="0.1" id="temperature" name="temperature" required>
+
+                <label for="internal_resistance">Internal Resistance (mΩ):</label>
+                <input type="number" step="0.1" id="internal_resistance" name="internal_resistance" required>
+
+                <button type="submit">Predict</button>
+            </form>
+
+            {% if health is not none and status is not none %}
+            <div class="results">
+                <h2>Predicted Battery Health: {{ health }}%</h2>
+                <h2>Battery Status: {{ status }}</h2>
+            </div>
+            {% elif error %}
+            <div class="error">Error: {{ error }}</div>
+            {% endif %}
+        </div>
+        <div class="action-buttons">
+            <button onclick="window.location.href='dashboard.html'">Go to Dashboard</button>
+        </div>
+    </div>
+</body>
+
+</html> -->
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Predict Battery Health</title>
+    <style>
+        /* General styles */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #e8f5e9;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background: #ffffff;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            padding: 20px;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+        }
+
+        h1 {
+            color: green;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-weight: bold;
+            margin: 10px 0 5px;
+            text-align: left;
+        }
+
+        input[type="number"] {
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: #43a047;
+            color: white;
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: darkgreen;
+        }
+
+        .results {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e9f7ff;
+            border: 1px solid #bde4ff;
+            border-radius: 5px;
+            text-align: left;
+        }
+
+        .results h2 {
+            margin: 10px 0;
+            font-size: 18px;
+            color: #333;
+        }
+
+        .error {
+            color: #d8000c;
+            background-color: #ffbaba;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            text-align: center;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 15px;
+            }
+
+            h1 {
+                font-size: 20px;
+            }
+
+            button {
+                font-size: 14px;
+            }
+        }
+
+        .action-buttons {
+            display: flex;
+            justify-content: center;
+            margin-top: 30px;
+        }
+
+        .action-buttons button {
+            background-color: #43a047;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 1em;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease;
+        }
+
+        .action-buttons button:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+
+<body>
+    <div>
+        <div class="container">
+            <h1>Battery Health Prediction</h1>
+            <form method="POST" id="batteryForm">
+                <label for="capacity">Battery Capacity (mAh):</label>
+                <input type="number" step="0.01" id="capacity" name="capacity" required>
+
+                <label for="cycle_count">Cycle Count:</label>
+                <input type="number" id="cycle_count" name="cycle_count" required>
+
+                <label for="voltage">Voltage (V):</label>
+                <input type="number" step="0.01" id="voltage" name="voltage" required>
+
+                <label for="temperature">Temperature (°C):</label>
+                <input type="number" step="0.1" id="temperature" name="temperature" required>
+
+                <label for="internal_resistance">Internal Resistance (mΩ):</label>
+                <input type="number" step="0.1" id="internal_resistance" name="internal_resistance" required>
+
+                <button type="submit">Predict</button>
+            </form>
+
+            {% if health is not none and status is not none %}
+            <div class="results">
+                <h2>Predicted Battery Health: {{ health }}%</h2>
+                <h2>Battery Status: {{ status }}</h2>
+            </div>
+            {% elif error %}
+            <div class="error">Error: {{ error }}</div>
+            {% endif %}
+        </div>
+        <div class="action-buttons">
+            <button onclick="window.location.href='dashboard.html'">Go to Dashboard</button>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('batteryForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            let valid = true;
+            document.querySelectorAll('.error-message').forEach(el => el.remove());
+
+            const capacity = document.getElementById('capacity');
+            const cycleCount = document.getElementById('cycle_count');
+            const voltage = document.getElementById('voltage');
+            const temperature = document.getElementById('temperature');
+            const internalResistance = document.getElementById('internal_resistance');
+
+            function showError(input, message) {
+                const error = document.createElement('div');
+                error.classList.add('error-message');
+                error.style.color = 'red';
+                error.textContent = message;
+                input.parentNode.insertBefore(error, input.nextSibling);
+            }
+
+            if (capacity.value <= 0 || isNaN(capacity.value)) {
+                showError(capacity, "Battery capacity must be a positive number.");
+                valid = false;
+            }
+            if (cycleCount.value < 0 || isNaN(cycleCount.value)) {
+                showError(cycleCount, "Cycle count must be a non-negative number.");
+                valid = false;
+            }
+            if (voltage.value < 0 || voltage.value > 5 || isNaN(voltage.value)) {
+                showError(voltage, "Voltage must be between 0 and 5.");
+                valid = false;
+            }
+            if (temperature.value < -50 || temperature.value > 100 || isNaN(temperature.value)) {
+                showError(temperature, "Temperature must be between -50 and 100.");
+                valid = false;
+            }
+            if (internalResistance.value <= 0 || isNaN(internalResistance.value)) {
+                showError(internalResistance, "Internal resistance must be a positive number.");
+                valid = false;
+            }
+
+            if (valid) {
+                this.submit();
+            }
+        });
+    </script>
+</body>
+
+</html>

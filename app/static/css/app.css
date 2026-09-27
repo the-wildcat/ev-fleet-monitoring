@@ -1,0 +1,65 @@
+:root {
+  --brand: #2e7d32;
+  --brand-light: #e8f5e9;
+}
+
+body {
+  background: #f5f7f6;
+}
+
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 250px;
+  flex-shrink: 0;
+  background: var(--brand);
+}
+
+.sidebar .brand {
+  color: #fff;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.sidebar .nav-link {
+  color: rgba(255, 255, 255, 0.9);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sidebar .nav-link:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.sidebar .nav-link.active {
+  background: #fff;
+  color: var(--brand);
+}
+
+.sidebar .nav-link.disabled {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+}
+
+.module-card {
+  border: 0;
+  border-left: 4px solid var(--brand);
+}
+
+@media (max-width: 768px) {
+  .app-shell {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+  }
+}

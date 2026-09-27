@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Driver Behavior</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f3f4f6;
+            margin: 0;
+            padding: 0;
+        }
+
+        header {
+            background-color: #43a047;
+            color: white;
+            padding: 20px 0;
+            text-align: center;
+            position: relative;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin: 10px 0;
+        }
+
+        header p {
+            margin: 5px 0;
+        }
+
+        section {
+            margin: 20px;
+        }
+
+        .alert-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .alert-card {
+            background-color: #ffffff;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            padding: 20px;
+            width: 48%;
+            min-width: 250px;
+            max-width: 500px;
+        }
+
+        .alert-card h3 {
+            margin-top: 0;
+            color: #e74c3c;
+        }
+
+        .alert-card p {
+            font-size: 1em;
+            color: #2c3e50;
+        }
+
+        .alert-card .button {
+            background-color: #e74c3c;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-align: center;
+            width: 100%;
+        }
+
+        .alert-card .button:hover {
+            background-color: #c0392b;
+        }
+
+        .behavior-card {
+            background-color: #fff;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .behavior-card h3 {
+            color: #3498db;
+        }
+
+        .behavior-card table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        .behavior-card th,
+        .behavior-card td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+
+        .behavior-card th {
+            background-color: #ecf0f1;
+        }
+
+        footer {
+            text-align: center;
+            background-color: #34495e;
+            color: white;
+            padding: 10px 0;
+            position: fixed;
+            width: 100%;
+            bottom: 0;
+        }
+
+        footer p {
+            margin: 0;
+        }
+
+        .action-buttons {
+            display: flex;
+            justify-content: center;
+            /* Center horizontally */
+            margin-top: 30px;
+            /* Reset margin to avoid offset */
+        }
+
+
+        .action-buttons button {
+            background-color: #43a047;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 1em;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease;
+        }
+
+        .action-buttons button:hover {
+            transform: scale(1.05);
+        }
+
+        .action-buttons {
+            display: flex;
+            justify-content: center;
+            /* Center horizontally */
+            margin-top: 30px;
+            /* Reset margin to avoid offset */
+        }
+
+
+        .action-buttons button {
+            background-color: #43a047;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 1em;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease;
+        }
+
+        .action-buttons button:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+
+<body>
+    <div>
+        <header>
+            <h1>Driver Behavior</h1>
+        </header>
+
+        <section class="behavior-analysis">
+            <div class="behavior-card">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Driver ID</th>
+                            <th>Speed (km/h)</th>
+                            <th>Brake Force</th>
+                            <th>Acceleration</th>
+                            <th>Driving Time (mins)</th>
+                            <th>Alert</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>1</td>
+                            <td>55</td>
+                            <td>2</td>
+                            <td>3</td>
+                            <td>30</td>
+                            <td>No</td>
+                        </tr>
+                        <tr>
+                            <td>2</td>
+                            <td>85</td>
+                            <td>4</td>
+                            <td>2</td>
+                            <td>50</td>
+                            <td>Yes</td>
+                        </tr>
+                        <tr>
+                            <td>3</td>
+                            <td>90</td>
+                            <td>5</td>
+                            <td>4</td>
+                            <td>45</td>
+                            <td>Yes</td>
+                        </tr>
+                        <tr>
+                            <td>4</td>
+                            <td>65</td>
+                            <td>3</td>
+                            <td>5</td>
+                            <td>60</td>
+                            <td>No</td>
+                        </tr>
+                        <tr>
+                            <td>5</td>
+                            <td>100</td>
+                            <td>2</td>
+                            <td>2</td>
+                            <td>35</td>
+                            <td>Yes</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+        <div class="action-buttons">
+            <button onclick="window.location.href='dashboard.html'">Go to Dashboard</button>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,222 @@
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register Page</title>
+    <style>
+        /* Basic Styling */
+        body {
+            font-family: 'Roboto', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: #e8f5e9;
+            color: #333;
+        }
+
+        .register-container {
+            width: 320px;
+            padding: 30px;
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0px 8px 20px rgba(0, 0, 0, 0.15);
+            text-align: center;
+        }
+
+        .register-container h2 {
+            margin-bottom: 20px;
+            color: #444;
+        }
+
+        .register-container input[type="text"],
+        .register-container input[type="password"],
+        .register-container input[type="email"] {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-sizing: border-box;
+            transition: border 0.3s;
+        }
+
+        .register-container input[type="text"]:focus,
+        .register-container input[type="password"]:focus,
+        .register-container input[type="email"]:focus {
+            border-color: #fda085;
+            outline: none;
+        }
+
+        .register-container button {
+            width: 100%;
+            padding: 12px;
+            background-color: #42b72a;
+            color: white;
+            font-weight: bold;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .register-container button:hover {
+            background-color: #43a047;
+        }
+    </style>
+</head>
+<body>
+    <div class="register-container">
+        <h1 style="color: #43a047;">Create New Account</h1>
+        <input type="text" id="fullname" placeholder="Enter Your Full Name">
+        <input type="email" id="email" placeholder="Enter Email Address">
+        <input type="password" id="password" placeholder="Eneter Password">
+        <button onclick="register()">Sign Up</button>
+    </div>
+
+    <script>
+        // Function to handle registration
+        function register() {
+            const fullname = document.getElementById("fullname").value;
+            const email = document.getElementById("email").value;
+            const password = document.getElementById("password").value;
+
+            if (fullname && email && password) {
+                alert("Account created successfully!");
+                // Redirect to login page or save user data as needed
+                window.location.href = "vehicle_registration.html";
+            } else {
+                alert("Please fill out all fields.");
+            }
+        }
+    </script>
+</body>
+</html> -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up Page</title>
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: #e8f5e9;
+            color: #333;
+        }
+
+        .signup-container {
+            width: 320px;
+            padding: 30px;
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0px 8px 20px rgba(0, 0, 0, 0.15);
+            text-align: center;
+        }
+
+        .signup-container h2 {
+            margin-bottom: 20px;
+            color: #444;
+        }
+
+        .signup-container input[type="text"],
+        .signup-container input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-sizing: border-box;
+        }
+
+        .signup-container button {
+            width: 100%;
+            padding: 12px;
+            background-color: dodgerblue;
+            color: white;
+            font-weight: bold;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .signup-container button:hover {
+            background-color: blue;
+        }
+
+        .error-message {
+            color: red;
+            font-size: 14px;
+            text-align: left;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="signup-container">
+        <h1 style="color: #43a047;">Sign Up</h1>
+        <input type="text" id="signupName" placeholder="Enter your name">
+        <p class="error-message" id="errorName"></p>
+
+        <input type="text" id="signupEmail" placeholder="Enter email address">
+        <p class="error-message" id="errorEmail"></p>
+
+        <input type="password" id="signupPassword" placeholder="Enter password">
+        <p class="error-message" id="errorPassword"></p>
+
+        <button onclick="signup()">Sign Up</button>
+    </div>
+
+    <script>
+        function signup() {
+            const name = document.getElementById("signupName").value;
+            const email = document.getElementById("signupEmail").value;
+            const password = document.getElementById("signupPassword").value;
+
+            const errorName = document.getElementById("errorName");
+            const errorEmail = document.getElementById("errorEmail");
+            const errorPassword = document.getElementById("errorPassword");
+
+            // Clear previous error messages
+            errorName.innerText = "";
+            errorEmail.innerText = "";
+            errorPassword.innerText = "";
+
+            let isValid = true;
+
+            // Name validation
+            if (name.trim() === "") {
+                errorName.innerText = "Name is required.";
+                isValid = false;
+            }
+
+            // Email validation (basic pattern check)
+            const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!email.match(emailPattern)) {
+                errorEmail.innerText = "Please enter a valid email address.";
+                isValid = false;
+            }
+
+            // Password validation
+            if (password.length < 8) {
+                errorPassword.innerText = "Password must be at least 8 characters long.";
+                isValid = false;
+            }
+
+            // If all fields are valid, show success message
+            if (isValid) {
+                alert("Sign Up Successful!");
+                window.location.href = "dashboard.html";
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register Your EV</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* Basic styling */
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: #e8f5e9;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            padding: 40px;
+            max-width: 600px;
+            background-color: #ffffff;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #444;
+            font-size: 2em;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        input[type="text"],
+        input[type="number"] {
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            font-size: 1em;
+            transition: border 0.3s, box-shadow 0.3s;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus {
+            border-color: #43a047;
+            box-shadow: 0 0 10px rgba(118, 75, 162, 0.5);
+            outline: none;
+        }
+
+        button {
+            background-color: #43a047;
+            color: white;
+            border: none;
+            padding: 15px 20px;
+            font-size: 1.2em;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: background-color 0.3s, box-shadow 0.3s;
+        }
+
+        button:hover {
+            background-color: #43a047;
+            box-shadow: 0 5px 15px rgba(90, 103, 216, 0.3);
+        }
+
+        table {
+            width: 100%;
+            margin-top: 30px;
+            border-collapse: collapse;
+        }
+
+        table,
+        th,
+        td {
+            border: 1px solid #ddd;
+        }
+
+        th,
+        td {
+            padding: 15px;
+            text-align: center;
+        }
+
+        th {
+            background-color: #43a047;
+            color: white;
+        }
+
+        .action-buttons {
+            display: flex;
+            justify-content: center;
+            /* Center horizontally */
+            margin-top: 30px;
+            /* Reset margin to avoid offset */
+        }
+
+
+        .action-buttons button {
+            background-color: #43a047;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 1em;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease;
+        }
+
+        .action-buttons button:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+
+<body>
+    <div>
+        <div class="container">
+            <h1 style="color: green;">Vehicle Registration</h1>
+            <form id="vehicleForm"> <input type="text" id="vehicleName" placeholder="Enter Vehicle Name" required>
+                <input type="text" id="vehicleModel" placeholder="Enter Vehicle Model" required> <input type="text"
+                    id="registrationNumber" placeholder="Enter Registration Number" required> <input type="number"
+                    id="batteryCapacity" placeholder="Enter Battery Capacity (kWh)" required> <button
+                    type="submit">Register
+                    Vehicle</button>
+            </form>
+            <table id="vehicleTable">
+                <thead>
+                    <tr>
+                        <th>Vehicle Name</th>
+                        <th>Model</th>
+                        <th>Registration Number</th>
+                        <th>Battery Capacity</th>
+                    </tr>
+                </thead>
+                <tbody> <!-- Vehicle registration data will be displayed here --> </tbody>
+            </table>
+        </div>
+        <div class="action-buttons">
+            <button onclick="window.location.href='dashboard.html'">Go to Dashboard</button>
+        </div>
+    </div>
+    <script>
+        // Simulate a local array to store registered vehicles
+        /* const vehicleData = [];
+
+        // Function to handle form submission and add vehicle to table
+        document.getElementById('vehicleForm').addEventListener('submit', function (event) {
+            event.preventDefault();
+
+            // Get form values
+            const vehicleName = document.getElementById('vehicleName').value;
+            const vehicleModel = document.getElementById('vehicleModel').value;
+            const registrationNumber = document.getElementById('registrationNumber').value;
+            const batteryCapacity = document.getElementById('batteryCapacity').value;
+
+            // Add new vehicle data to array
+            const newVehicle = {
+                name: vehicleName,
+                model: vehicleModel,
+                registration: registrationNumber,
+                battery: batteryCapacity
+            };
+            vehicleData.push(newVehicle);
+
+            // Reset form fields
+            document.getElementById('vehicleForm').reset();
+
+            // Display the updated vehicle data in the table
+            updateVehicleTable();
+
+            // Show the "Go to Dashboard" button
+            document.getElementById('dashboardButton').style.display = 'block';
+        });
+
+        // Function to update vehicle table
+        function updateVehicleTable() {
+            const tableBody = document.getElementById('vehicleTable').getElementsByTagName('tbody')[0];
+            tableBody.innerHTML = ''; // Clear existing rows
+
+            vehicleData.forEach(vehicle => {
+                const row = tableBody.insertRow();
+                row.insertCell(0).textContent = vehicle.name;
+                row.insertCell(1).textContent = vehicle.model;
+                row.insertCell(2).textContent = vehicle.registration;
+                row.insertCell(3).textContent = vehicle.battery;
+            });
+        }
+
+        // Function to handle "Go to Dashboard" button click
+        function goToDashboard() {
+            window.location.href = "dashboard.html"; // Redirect to the dashboard page
+        }*/
+
+        // Function to handle form submission and add vehicle to table with validation
+        /*document.getElementById('vehicleForm').addEventListener('submit', function (event) {
+            event.preventDefault();
+            let valid = true;
+        
+            // Get form values
+            const vehicleName = document.getElementById('vehicleName');
+            const vehicleModel = document.getElementById('vehicleModel');
+            const registrationNumber = document.getElementById('registrationNumber');
+            const batteryCapacity = document.getElementById('batteryCapacity');
+        
+            // Clear existing error messages
+            document.querySelectorAll('.error-message').forEach(el => el.remove());
+        
+            // Validation checks
+            if (!vehicleName.value.trim()) {
+                showError(vehicleName, "Vehicle name is required.");
+                valid = false;
+            }
+            if (!vehicleModel.value.trim()) {
+                showError(vehicleModel, "Vehicle model is required.");
+                valid = false;
+            }
+            if (!/^[A-Z]{2}\d{2}[A-Z]{2}\d{4}$/.test(registrationNumber.value)) {
+                showError(registrationNumber, "Enter a valid Indian registration number (e.g., KA01AB1234).");
+                valid = false;
+            }
+            if (isNaN(batteryCapacity.value) || batteryCapacity.value <= 0) {
+                showError(batteryCapacity, "Battery capacity must be a positive number.");
+                valid = false;
+            }
+        
+            // Stop submission if not valid
+            if (!valid) return;
+        
+            // Add new vehicle data to array if all inputs are valid
+            const newVehicle = {
+                name: vehicleName.value,
+                model: vehicleModel.value,
+                registration: registrationNumber.value,
+                battery: batteryCapacity.value
+            };
+            vehicleData.push(newVehicle);
+        
+            // Reset form fields
+            document.getElementById('vehicleForm').reset();
+        
+            // Display the updated vehicle data in the table
+            updateVehicleTable();
+        });
+        
+        // Function to display error messages below input fields
+        function showError(input, message) {
+            const error = document.createElement('span');
+            error.classList.add('error-message');
+            error.style.color = 'red';
+            error.textContent = message;
+            input.parentNode.insertBefore(error, input.nextSibling);
+        }*/
+
+        // Define the array to store registered vehicles globally
+        const vehicleData = [];
+
+        // Function to handle form submission and add vehicle to table with validation
+        document.getElementById('vehicleForm').addEventListener('submit', function (event) {
+            event.preventDefault();
+            let valid = true;
+
+            // Get form values
+            const vehicleName = document.getElementById('vehicleName');
+            const vehicleModel = document.getElementById('vehicleModel');
+            const registrationNumber = document.getElementById('registrationNumber');
+            const batteryCapacity = document.getElementById('batteryCapacity');
+
+            // Clear existing error messages
+            document.querySelectorAll('.error-message').forEach(el => el.remove());
+
+            // Validation checks
+            if (!vehicleName.value.trim()) {
+                showError(vehicleName, "Vehicle name is required.");
+                valid = false;
+            }
+            if (!vehicleModel.value.trim()) {
+                showError(vehicleModel, "Vehicle model is required.");
+                valid = false;
+            }
+            // if (!/^[A-Z]{2}\d{2}[A-Z]{2}\d{4}$/.test(registrationNumber.value)) {
+            //     showError(registrationNumber, "Enter a valid Indian registration number (e.g., WB12 AD3456).");
+            //     valid = false;
+            // }
+            if (!/^[A-Z]{2}\d{2} [A-Z]{2}\d{4}$/.test(registrationNumber.value)) {
+                showError(registrationNumber, "Enter a valid Indian registration number (e.g., WB12 AD3456).");
+                valid = false;
+            }
+
+            if (isNaN(batteryCapacity.value) || batteryCapacity.value <= 0) {
+                showError(batteryCapacity, "Battery capacity must be a positive number.");
+                valid = false;
+            }
+
+            // Stop submission if not valid
+            if (!valid) return;
+
+            // Add new vehicle data to array if all inputs are valid
+            const newVehicle = {
+                name: vehicleName.value,
+                model: vehicleModel.value,
+                registration: registrationNumber.value,
+                battery: batteryCapacity.value
+            };
+            vehicleData.push(newVehicle);
+
+            // Reset form fields
+            document.getElementById('vehicleForm').reset();
+
+            // Display the updated vehicle data in the table
+            updateVehicleTable();
+        });
+
+        // Function to update vehicle table with the latest data
+        function updateVehicleTable() {
+            const tableBody = document.querySelector("#vehicleTable tbody");
+            tableBody.innerHTML = ""; // Clear the table before adding new data
+
+            vehicleData.forEach(vehicle => {
+                const row = tableBody.insertRow();
+                row.insertCell(0).textContent = vehicle.name;
+                row.insertCell(1).textContent = vehicle.model;
+                row.insertCell(2).textContent = vehicle.registration;
+                row.insertCell(3).textContent = vehicle.battery;
+            });
+        }
+
+        // Function to display error messages below input fields
+        function showError(input, message) {
+            const error = document.createElement('span');
+            error.classList.add('error-message');
+            error.style.color = 'red';
+            error.textContent = message;
+            input.parentNode.insertBefore(error, input.nextSibling);
+        }
+    </script>
+</body>
+
+</html>

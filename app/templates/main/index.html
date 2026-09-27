@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Overview{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-1">Real-Time EV Fleet Monitoring &amp; Predictive Analytics</h1>
+<p class="text-muted mb-4">
+  Monitor vehicle performance, battery health, charging and driver behaviour; plan routes around
+  charging stations; and analyse energy use and operating costs.
+</p>
+
+{% set modules = [
+  ("1", "User Authentication & Roles", "Sign-up with email verification, secure login, fleet manager / driver roles."),
+  ("2", "EV Registration & Real-Time Monitoring", "Vehicle records with service history; live location, speed, battery and charging status."),
+  ("3", "Route Optimisation & Battery Health", "Routes with charging stops based on battery level; ML battery-health prediction and alerts."),
+  ("4", "Driver Behaviour & Maintenance Alerts", "Speed, braking and acceleration analysis; rule-based maintenance alerts."),
+  ("5", "Energy & Cost Analysis", "Energy consumption and operating cost per vehicle and period."),
+  ("6", "Report Generation", "Customisable reports exported as PDF, Excel or CSV."),
+] %}
+
+<div class="row g-3">
+  {% for number, name, summary in modules %}
+    <div class="col-md-6 col-xl-4">
+      <div class="card module-card shadow-sm h-100">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <span class="text-muted small">Module {{ number }}</span>
+            <span class="badge text-bg-secondary">In progress</span>
+          </div>
+          <h2 class="h6">{{ name }}</h2>
+          <p class="small text-muted mb-0">{{ summary }}</p>
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

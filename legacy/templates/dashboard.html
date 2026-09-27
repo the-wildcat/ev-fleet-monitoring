@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EV Charging Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* Basic styling */
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f4f8;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        .sidebar {
+            width: 250px;
+            background-color: #43a047;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+            position: fixed;
+            height: 100%;
+        }
+
+        .sidebar h2 {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .sidebar a {
+            color: white;
+            text-decoration: none;
+            margin: 10px 0;
+            font-size: 1.1em;
+            display: flex;
+            align-items: center;
+        }
+
+        .sidebar a i {
+            margin-right: 10px;
+        }
+
+        .main-content {
+            margin-left: 280px;
+            /* Extra space for sidebar */
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+            background-color: #ffffff;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .info-box-container {
+            display: flex;
+            gap: 10px;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .info-box {
+            background-color: #43a047;
+            color: white;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            width: 22%;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease;
+        }
+
+        .info-box:hover {
+            transform: scale(1.05);
+        }
+
+        .info-box h3 {
+            margin: 10px 0 5px;
+            font-size: 1.5em;
+        }
+
+        .info-box p {
+            margin: 0;
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        .info-box i {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        canvas {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+        }
+
+        /* Mobile styling */
+        @media (max-width: 768px) {
+            .sidebar {
+                position: relative;
+                width: 100%;
+                padding: 10px;
+                flex-direction: row;
+                overflow-x: auto;
+                justify-content: space-around;
+            }
+
+            .sidebar h2 {
+                display: none;
+                /* Hide title on mobile for more space */
+            }
+
+            .main-content {
+                margin-left: 0;
+            }
+
+            .info-box-container {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .info-box {
+                width: 100%;
+                max-width: 300px;
+                margin-bottom: 10px;
+            }
+        }
+
+        .action-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+
+        .action-buttons button {
+            background-color: #43a047;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 1em;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease;
+        }
+
+        .action-buttons button:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="sidebar">
+        <h2>Menu</h2>
+        <a href="register.html"><i class="fas fa-pencil-alt"></i> Register Your EV</a>
+        <a href="battery_health.html"><i class="fas fa-battery-full"></i> Predict Battery Health</a>
+        <a href="optimize_route.html"><i class="fas fa-map-signs"></i> Get Optimized Route</a>
+        <a href="driver_behavior.html"><i class="fas fa-car-crash"></i> Driver Behavior</a>
+        <a href="maintenance_alert.html"><i class="fas fa-tools"></i> Maintenance Alerts</a>
+        <a href="energy_consumption.html"><i class="fas fa-chart-line"></i> Energy Consumption & Cost Analysis</a>
+        <a href="report_generation.html"><i class="fas fa-file-alt"></i> Report Generation</a>
+        <br><br><br><br><br><br><br><br><br><br><br><br><br><br>
+        <button style=" align-self:center;
+                        background-color:crimson; 
+                        color: white; 
+                        border: none; 
+                        padding: 10px 20px; 
+                        border-radius: 5px; 
+                        font-size: 1em; 
+                        cursor: pointer; 
+                        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); 
+                        transition: transform 0.2s ease;" onclick="window.location.href='home_page.html'">
+            Log Out
+        </button>
+    </div>
+
+    <div class="main-content">
+        <div class="container">
+
+            <div class="info-box-container">
+                <div class="info-box">
+                    <i class="fas fa-bolt"></i>
+                    <h3>1479 Watt</h3>
+                    <p>Current Power</p>
+                    <small>Max today: 2369 Watt</small>
+                </div>
+                <div class="info-box">
+                    <i class="fas fa-info-circle"></i>
+                    <h3>19.74 kWh</h3>
+                    <p>Daily Energy</p>
+                    <small>Last 7 days</small>
+                </div>
+                <div class="info-box">
+                    <i class="fas fa-lightbulb"></i>
+                    <h3>9,564 kWh</h3>
+                    <p>Total Energy</p>
+                    <small>Current year</small>
+                </div>
+                <div class="info-box">
+                    <i class="fas fa-thermometer-half"></i>
+                    <h3>23.4°C</h3>
+                    <p>Current Temperature</p>
+                    <small>Current weather</small>
+                </div>
+            </div>
+
+            <canvas id="chargingLoadChart"></canvas>
+
+            <div class="action-buttons">
+                <button onclick="window.location.href='home_page.html'">Go Back to Home</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Sample data for "Charging_Load_kW" - replace with actual data from your dataset
+        const chargingLoadData = [15.9, 35.7, 75.3, 95.1, 78.9, 65.4, 68.4, 75.9, 48.6, 75.9, 65.7, 45.9];
+
+        // Chart.js histogram
+        const ctx = document.getElementById('chargingLoadChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                datasets: [{
+                    label: 'Charging Load (kW)',
+                    data: chargingLoadData,
+                    backgroundColor: '#43a047',
+                    borderColor: 'rgba(33, 150, 243, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                animation: {
+                    duration: 1500,
+                    easing: 'easeOutBounce'
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Charging Load (kW)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Month'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    },
+                    tooltip: {
+                        enabled: true
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>

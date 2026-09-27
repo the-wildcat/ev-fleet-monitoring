@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Flask instance folder (SQLite DB, uploads)
+instance/
+*.db
+*.sqlite3
+
+# Testing / tooling
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Editors / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
