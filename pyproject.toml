@@ -15,6 +15,8 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Make the project root importable so `pytest` works like `python -m pytest`
+pythonpath = ["."]
 addopts = "-q"
 
 [tool.coverage.run]

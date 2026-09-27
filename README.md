@@ -18,7 +18,8 @@ pytest                           # run the test suite
 ruff check .                     # lint
 ```
 
-On macOS/Linux, activate with `source .venv/bin/activate` and copy with `cp .env.example .env`.
+In Git Bash on Windows, activate with `source .venv/Scripts/activate`. On macOS/Linux, use
+`source .venv/bin/activate`. In both, copy the env file with `cp .env.example .env`.
 
 ## Project layout
 
