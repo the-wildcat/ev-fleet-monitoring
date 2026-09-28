@@ -1,0 +1,11 @@
+Hi {{ user.name }},
+
+Someone tried to create a new EV Fleet Monitor account with this email address, but you
+already have one.
+
+If that was you, log in here: {{ login_link }}
+Forgot your password? Reset it here: {{ reset_link }}
+
+If it wasn't you, no action is needed. Your account is unchanged.
+
+- EV Fleet Monitor

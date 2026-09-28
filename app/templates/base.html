@@ -31,22 +31,49 @@
       <a href="{{ url_for('main.index') }}" class="brand mb-4 text-decoration-none">
         <i class="bi bi-ev-front-fill"></i> EV Fleet Monitor
       </a>
-      <ul class="nav nav-pills flex-column gap-1">
-        {% for endpoint, icon, label in nav %}
-          <li class="nav-item">
-            {% if endpoint %}
-              <a class="nav-link {{ 'active' if request.endpoint == endpoint }}" href="{{ url_for(endpoint) }}">
-                <i class="bi bi-{{ icon }}"></i> {{ label }}
+      {% if current_user.is_authenticated %}
+        <ul class="nav nav-pills flex-column gap-1">
+          {% for endpoint, icon, label in nav %}
+            <li class="nav-item">
+              {% if endpoint %}
+                <a class="nav-link {{ 'active' if request.endpoint == endpoint }}" href="{{ url_for(endpoint) }}">
+                  <i class="bi bi-{{ icon }}"></i> {{ label }}
+                </a>
+              {% else %}
+                <span class="nav-link disabled" aria-disabled="true">
+                  <i class="bi bi-{{ icon }}"></i> {{ label }}
+                  <span class="badge text-bg-light ms-auto">soon</span>
+                </span>
+              {% endif %}
+            </li>
+          {% endfor %}
+          {% if current_user.is_admin %}
+            <li class="nav-item mt-3"><small class="text-white-50 text-uppercase">Admin</small></li>
+            <li class="nav-item">
+              <a class="nav-link {{ 'active' if request.endpoint == 'admin.users' }}" href="{{ url_for('admin.users') }}">
+                <i class="bi bi-people"></i> Users
               </a>
-            {% else %}
-              <span class="nav-link disabled" aria-disabled="true">
-                <i class="bi bi-{{ icon }}"></i> {{ label }}
-                <span class="badge text-bg-light ms-auto">soon</span>
-              </span>
-            {% endif %}
-          </li>
-        {% endfor %}
-      </ul>
+            </li>
+          {% endif %}
+        </ul>
+
+        <div class="mt-auto pt-4 text-white">
+          <div class="small">{{ current_user.name }}</div>
+          <span class="badge text-bg-light mb-2">{{ current_user.role.label }}</span>
+          <div class="d-flex gap-2">
+            <a class="btn btn-sm btn-outline-light" href="{{ url_for('auth.profile') }}"><i class="bi bi-person"></i> Profile</a>
+            <form method="post" action="{{ url_for('auth.logout') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-light"><i class="bi bi-box-arrow-right"></i> Log out</button>
+            </form>
+          </div>
+        </div>
+      {% else %}
+        <ul class="nav nav-pills flex-column gap-1">
+          <li class="nav-item"><a class="nav-link {{ 'active' if request.endpoint == 'auth.login' }}" href="{{ url_for('auth.login') }}"><i class="bi bi-box-arrow-in-right"></i> Log in</a></li>
+          <li class="nav-item"><a class="nav-link {{ 'active' if request.endpoint == 'auth.register' }}" href="{{ url_for('auth.register') }}"><i class="bi bi-person-plus"></i> Sign up</a></li>
+        </ul>
+      {% endif %}
     </nav>
 
     <main class="content p-4">

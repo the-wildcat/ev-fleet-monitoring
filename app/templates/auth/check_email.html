@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% from "_macros.html" import auth_card %}
+{% block title %}Check your email{% endblock %}
+
+{% block content %}
+{% call auth_card("Check your email") %}
+  <p class="mb-2"><i class="bi bi-envelope-check text-success fs-3"></i></p>
+  {% if purpose == "reset" %}
+    <p>If an account exists for <strong>{{ email }}</strong>, we've sent a link to reset your password.
+       It expires in 1 hour.</p>
+  {% else %}
+    <p>We've sent a verification link to <strong>{{ email }}</strong>. Click it to activate your account.
+       The link expires in 24 hours.</p>
+  {% endif %}
+  {% if not config.MAIL_SERVER %}
+    <div class="alert alert-info small mb-0">
+      <strong>Development mode:</strong> email isn't configured, so the link was printed in the
+      terminal running <code>flask run</code>.
+    </div>
+  {% endif %}
+  <hr>
+  <p class="mb-0 text-center"><a href="{{ url_for('auth.login') }}">Back to log in</a></p>
+{% endcall %}
+{% endblock %}

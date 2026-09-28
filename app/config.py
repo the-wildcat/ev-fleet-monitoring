@@ -14,6 +14,23 @@ class Config:
 
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
+    REMEMBER_COOKIE_HTTPONLY = True
+
+    # Auth security
+    EMAIL_VERIFY_MAX_AGE = 24 * 3600  # seconds a verification link stays valid
+    PASSWORD_RESET_MAX_AGE = 3600
+    LOGIN_MAX_ATTEMPTS = 5
+    LOGIN_LOCKOUT_MINUTES = 15
+
+    # Email: SMTP when MAIL_SERVER is set, otherwise emails are written to the log.
+    MAIL_SERVER = os.environ.get("MAIL_SERVER", "")
+    MAIL_PORT = int(os.environ.get("MAIL_PORT", "587"))
+    MAIL_USE_TLS = os.environ.get("MAIL_USE_TLS", "true").lower() == "true"
+    MAIL_USERNAME = os.environ.get("MAIL_USERNAME", "")
+    MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD", "")
+    MAIL_DEFAULT_SENDER = os.environ.get(
+        "MAIL_DEFAULT_SENDER", "EV Fleet Monitor <no-reply@localhost>"
+    )
 
     @staticmethod
     def database_url(default: str) -> str:
@@ -37,11 +54,13 @@ class TestingConfig(Config):
     SECRET_KEY = "test-key"
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
     WTF_CSRF_ENABLED = False
+    MAIL_SERVER = ""  # never send real email from tests
 
 
 class ProductionConfig(Config):
     DEBUG = False
     SESSION_COOKIE_SECURE = True
+    REMEMBER_COOKIE_SECURE = True
     SQLALCHEMY_DATABASE_URI = Config.database_url(
         f"sqlite:///{BASE_DIR / 'instance' / 'ev_fleet.db'}"
     )

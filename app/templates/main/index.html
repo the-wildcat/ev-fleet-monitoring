@@ -7,6 +7,12 @@
   Monitor vehicle performance, battery health, charging and driver behaviour; plan routes around
   charging stations; and analyse energy use and operating costs.
 </p>
+{% if not current_user.is_authenticated %}
+  <div class="mb-4 d-flex gap-2">
+    <a class="btn btn-success" href="{{ url_for('auth.login') }}">Log in</a>
+    <a class="btn btn-outline-success" href="{{ url_for('auth.register') }}">Create an account</a>
+  </div>
+{% endif %}
 
 {% set modules = [
   ("1", "User Authentication & Roles", "Sign-up with email verification, secure login, fleet manager / driver roles."),
@@ -24,7 +30,11 @@
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-start mb-2">
             <span class="text-muted small">Module {{ number }}</span>
-            <span class="badge text-bg-secondary">In progress</span>
+            {% if number == "1" %}
+              <span class="badge text-bg-success">Live</span>
+            {% else %}
+              <span class="badge text-bg-secondary">In progress</span>
+            {% endif %}
           </div>
           <h2 class="h6">{{ name }}</h2>
           <p class="small text-muted mb-0">{{ summary }}</p>

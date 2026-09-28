@@ -1,0 +1,9 @@
+Hi {{ user.name }},
+
+Welcome to EV Fleet Monitor! Please confirm your email address by opening this link:
+
+{{ link }}
+
+The link expires in 24 hours. If you didn't create this account, you can ignore this email.
+
+- EV Fleet Monitor

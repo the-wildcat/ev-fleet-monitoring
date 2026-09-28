@@ -1,0 +1,31 @@
+{# Render a WTForms field as a Bootstrap form group with its validation errors. #}
+{% macro field(f, autofocus=false) %}
+  {% if f.type == "BooleanField" %}
+    <div class="form-check mb-3">
+      {{ f(class_="form-check-input") }}
+      {{ f.label(class_="form-check-label") }}
+    </div>
+  {% else %}
+    <div class="mb-3">
+      {{ f.label(class_="form-label") }}
+      {{ f(class_="form-control" + (" is-invalid" if f.errors else ""), autofocus=autofocus) }}
+      {% for error in f.errors %}
+        <div class="invalid-feedback">{{ error }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endmacro %}
+
+{# Centered card used by all the auth pages. #}
+{% macro auth_card(title) %}
+  <div class="row justify-content-center">
+    <div class="col-sm-10 col-md-7 col-lg-5">
+      <div class="card shadow-sm">
+        <div class="card-body p-4">
+          <h1 class="h4 mb-3">{{ title }}</h1>
+          {{ caller() }}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endmacro %}

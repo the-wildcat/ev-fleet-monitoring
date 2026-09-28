@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% from "_macros.html" import field %}
+{% block title %}My profile{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-4">My profile</h1>
+<div class="row g-4">
+  <div class="col-lg-5">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="h6 text-muted">Account</h2>
+        <dl class="row mb-0">
+          <dt class="col-4">Name</dt><dd class="col-8">{{ current_user.name }}</dd>
+          <dt class="col-4">Email</dt><dd class="col-8">{{ current_user.email }}</dd>
+          <dt class="col-4">Role</dt><dd class="col-8"><span class="badge text-bg-success">{{ current_user.role.label }}</span></dd>
+          <dt class="col-4">Member since</dt><dd class="col-8">{{ current_user.created_at.strftime("%d %b %Y") }}</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="h6 text-muted">Change password</h2>
+        <form method="post" novalidate>
+          {{ form.hidden_tag() }}
+          {{ field(form.current_password) }}
+          {{ field(form.password) }}
+          {{ field(form.confirm) }}
+          {{ form.submit(class_="btn btn-success") }}
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

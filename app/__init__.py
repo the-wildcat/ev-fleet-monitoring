@@ -10,7 +10,7 @@ import os
 from flask import Flask
 
 from app.config import CONFIGS
-from app.extensions import csrf, db, migrate
+from app.extensions import csrf, db, login_manager, migrate
 
 _PLACEHOLDER_KEYS = {"change-me", "dev-only-insecure-key"}
 
@@ -32,14 +32,23 @@ def create_app(config_name: str | None = None) -> Flask:
     _configure_logging(app)
 
     db.init_app(app)
-    migrate.init_app(app, db)
+    # Batch mode lets Alembic alter tables on SQLite, which can't ALTER most columns in place.
+    migrate.init_app(app, db, render_as_batch=True)
+    login_manager.init_app(app)
     csrf.init_app(app)
 
+    from app import models  # noqa: F401  (register tables and the user loader)
+    from app.admin import bp as admin_bp
+    from app.auth import bp as auth_bp
+    from app.cli import register_cli
     from app.errors import register_error_handlers
     from app.main import bp as main_bp
 
     app.register_blueprint(main_bp)
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(admin_bp)
     register_error_handlers(app)
+    register_cli(app)
 
     app.logger.info("App started (env=%s)", config_name)
     return app

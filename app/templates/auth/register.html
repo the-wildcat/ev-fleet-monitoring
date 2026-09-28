@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% from "_macros.html" import field, auth_card %}
+{% block title %}Sign up{% endblock %}
+
+{% block content %}
+{% call auth_card("Create your account") %}
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    {{ field(form.name, autofocus=true) }}
+    {{ field(form.email) }}
+    {{ field(form.password) }}
+    <div class="form-text mt-n2 mb-3">At least 8 characters, including a letter and a number.</div>
+    {{ field(form.confirm) }}
+    {{ form.submit(class_="btn btn-success w-100") }}
+  </form>
+  <p class="small text-muted mt-3 mb-0">
+    New accounts start with the <strong>Driver</strong> role. An administrator can upgrade you to Fleet Manager.
+  </p>
+  <hr>
+  <p class="mb-0 text-center">Already have an account? <a href="{{ url_for('auth.login') }}">Log in</a></p>
+{% endcall %}
+{% endblock %}

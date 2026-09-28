@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% from "_macros.html" import field, auth_card %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+{% call auth_card(title) %}
+  <p class="text-muted">{{ intro }}</p>
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    {{ field(form.email, autofocus=true) }}
+    {{ form.submit(class_="btn btn-success w-100") }}
+  </form>
+  <hr>
+  <p class="mb-0 text-center"><a href="{{ url_for('auth.login') }}">Back to log in</a></p>
+{% endcall %}
+{% endblock %}
