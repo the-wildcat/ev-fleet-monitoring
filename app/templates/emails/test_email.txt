@@ -1,0 +1,6 @@
+Hello,
+
+This is a test email from EV Fleet Monitor. If you're reading this, outgoing email is set up
+correctly: verification and password-reset emails will be delivered.
+
+- EV Fleet Monitor

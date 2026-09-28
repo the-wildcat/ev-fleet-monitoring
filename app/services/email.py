@@ -11,8 +11,12 @@ from email.message import EmailMessage
 from flask import current_app, render_template
 
 
-def send_email(to: str, subject: str, template: str, **context) -> None:
-    """Render `emails/<template>.txt` and send it to `to`."""
+def send_email(to: str, subject: str, template: str, raise_errors: bool = False, **context) -> bool:
+    """Render `emails/<template>.txt` and send it to `to`. Returns True if it was delivered.
+
+    Delivery failures are logged rather than raised, so a mail outage doesn't break sign-up;
+    pass `raise_errors=True` to surface them (used by `flask send-test-email`).
+    """
     body = render_template(f"emails/{template}.txt", **context)
     cfg = current_app.config
 
@@ -27,7 +31,7 @@ def send_email(to: str, subject: str, template: str, **context) -> None:
 
     if not cfg["MAIL_SERVER"]:
         current_app.logger.info("Email (console mode) to %s: %s\n%s", to, subject, body)
-        return
+        return True
 
     try:
         with smtplib.SMTP(cfg["MAIL_SERVER"], cfg["MAIL_PORT"], timeout=15) as smtp:
@@ -36,7 +40,14 @@ def send_email(to: str, subject: str, template: str, **context) -> None:
             if cfg["MAIL_USERNAME"]:
                 smtp.login(cfg["MAIL_USERNAME"], cfg["MAIL_PASSWORD"])
             smtp.send_message(msg)
-        current_app.logger.info("Email sent to %s: %s", to, subject)
     except (smtplib.SMTPException, OSError):
-        # Don't break the user's request because the mail server is down; log it instead.
+        if raise_errors:
+            raise
         current_app.logger.exception("Failed to send email to %s: %s", to, subject)
+        if current_app.debug:
+            # Development only: show the message so the developer isn't stuck without the link.
+            current_app.logger.warning("Undelivered email body (debug mode):\n%s", body)
+        return False
+
+    current_app.logger.info("Email sent to %s: %s", to, subject)
+    return True

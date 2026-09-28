@@ -28,8 +28,11 @@ class Config:
     MAIL_USE_TLS = os.environ.get("MAIL_USE_TLS", "true").lower() == "true"
     MAIL_USERNAME = os.environ.get("MAIL_USERNAME", "")
     MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD", "")
-    MAIL_DEFAULT_SENDER = os.environ.get(
-        "MAIL_DEFAULT_SENDER", "EV Fleet Monitor <no-reply@localhost>"
+    # Gmail rejects mail whose From address isn't the authenticated account, so default to it.
+    MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER") or (
+        f"EV Fleet Monitor <{MAIL_USERNAME}>"
+        if MAIL_USERNAME
+        else "EV Fleet Monitor <no-reply@localhost>"
     )
 
     @staticmethod
