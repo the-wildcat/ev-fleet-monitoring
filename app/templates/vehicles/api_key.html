@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Device API key{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-4">Device API key for {{ vehicle.plate_number }}</h1>
+
+<div class="card shadow-sm" style="max-width: 760px">
+  <div class="card-body">
+    <div class="alert alert-warning">
+      <i class="bi bi-exclamation-triangle"></i>
+      <strong>Copy this key now. It won't be shown again.</strong>
+      Only a fingerprint of it is stored{{ "; the previous key no longer works" if rotated }}.
+    </div>
+    <label class="form-label" for="api-key">API key</label>
+    <div class="input-group mb-3">
+      <input id="api-key" class="form-control font-monospace" value="{{ api_key }}" readonly>
+      <button class="btn btn-outline-secondary" type="button" id="copy-key"><i class="bi bi-clipboard"></i> Copy</button>
+    </div>
+
+    <p class="mb-1">The vehicle's telematics device sends readings like this:</p>
+    <pre class="bg-light p-3 rounded small mb-3"><code>curl -X POST {{ url_for('api.ingest_telemetry', _external=True) }} \
+  -H "X-API-Key: {{ api_key }}" \
+  -H "Content-Type: application/json" \
+  -d '{"lat": 28.6139, "lon": 77.2090, "speed_kmh": 42.5, "soc_pct": 76.2,
+       "is_charging": false, "battery_temp_c": 31.4, "odometer_km": 15234.7}'</code></pre>
+
+    <a class="btn btn-success" href="{{ url_for('vehicles.vehicle_detail', vehicle_id=vehicle.id) }}">Go to vehicle</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.getElementById("copy-key").addEventListener("click", async (event) => {
+    const input = document.getElementById("api-key");
+    input.select();
+    try {
+      await navigator.clipboard.writeText(input.value);
+      event.currentTarget.innerHTML = '<i class="bi bi-check2"></i> Copied';
+    } catch {
+      event.currentTarget.textContent = "Press Ctrl+C";
+    }
+  });
+</script>
+{% endblock %}

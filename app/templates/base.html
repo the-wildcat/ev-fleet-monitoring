@@ -16,8 +16,8 @@
   #}
   {% set nav = [
     ("main.index", "speedometer2", "Overview"),
-    (None, "truck-front", "Vehicles"),
-    (None, "geo-alt", "Live Monitoring"),
+    ("vehicles.list_vehicles", "truck-front", "Vehicles"),
+    ("monitoring.live", "geo-alt", "Live Monitoring"),
     (None, "signpost-split", "Route Planner"),
     (None, "battery-half", "Battery Health"),
     (None, "person-badge", "Driver Behaviour"),
@@ -36,7 +36,7 @@
           {% for endpoint, icon, label in nav %}
             <li class="nav-item">
               {% if endpoint %}
-                <a class="nav-link {{ 'active' if request.endpoint == endpoint }}" href="{{ url_for(endpoint) }}">
+                <a class="nav-link {{ 'active' if request.endpoint == endpoint or (request.blueprint and endpoint.startswith(request.blueprint ~ '.') and request.blueprint != 'main') }}" href="{{ url_for(endpoint) }}">
                   <i class="bi bi-{{ icon }}"></i> {{ label }}
                 </a>
               {% else %}

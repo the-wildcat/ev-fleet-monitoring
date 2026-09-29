@@ -1,13 +1,17 @@
 import enum
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING
 
 from flask_login import UserMixin
 from sqlalchemy import Enum, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.extensions import db, login_manager
 from app.utils import utcnow
+
+if TYPE_CHECKING:
+    from app.models.vehicle import Vehicle
 
 
 class Role(enum.StrEnum):
@@ -39,8 +43,15 @@ class User(UserMixin, db.Model):
     last_login_at: Mapped[datetime | None]
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
 
+    vehicles: Mapped[list["Vehicle"]] = relationship(back_populates="driver")
+
     def __repr__(self) -> str:
         return f"<User {self.email} ({self.role})>"
+
+    @property
+    def is_manager(self) -> bool:
+        """Admins and fleet managers can manage the whole fleet."""
+        return self.role in (Role.ADMIN, Role.FLEET_MANAGER)
 
     # --- passwords -------------------------------------------------------------------------
     def set_password(self, password: str) -> None:

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "_macros.html" import field %}
+{% block title %}{{ "Edit " ~ vehicle.plate_number if vehicle else "Register EV" }}{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-4">{{ "Edit " ~ vehicle.plate_number if vehicle else "Register a new EV" }}</h1>
+
+<div class="card shadow-sm" style="max-width: 760px">
+  <div class="card-body">
+    <form method="post" novalidate>
+      {{ form.hidden_tag() }}
+      <div class="row">
+        <div class="col-md-5">{{ field(form.make, autofocus=not vehicle) }}</div>
+        <div class="col-md-5">{{ field(form.model) }}</div>
+        <div class="col-md-2">{{ field(form.year) }}</div>
+      </div>
+      <div class="row">
+        <div class="col-md-6">{{ field(form.plate_number) }}</div>
+        <div class="col-md-6">{{ field(form.vin) }}</div>
+      </div>
+      <div class="row">
+        <div class="col-md-6">{{ field(form.battery_capacity_kwh) }}</div>
+        <div class="col-md-6">{{ field(form.efficiency_km_per_kwh) }}</div>
+      </div>
+      <div class="row">
+        <div class="col-md-6">{{ field(form.status) }}</div>
+        <div class="col-md-6">{{ field(form.driver_id) }}</div>
+      </div>
+      {{ field(form.simulated) }}
+      <div class="form-text mt-n2 mb-3">
+        Leave this on until a real telematics device is fitted. Real devices send data to
+        <code>POST /api/v1/telemetry</code> with the vehicle's API key.
+      </div>
+      <div class="d-flex gap-2">
+        {{ form.submit(class_="btn btn-success") }}
+        <a class="btn btn-outline-secondary" href="{{ url_for('vehicles.vehicle_detail', vehicle_id=vehicle.id) if vehicle else url_for('vehicles.list_vehicles') }}">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

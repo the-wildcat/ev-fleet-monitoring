@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Live monitoring{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  #fleet-map { height: calc(100vh - 230px); min-height: 420px; border-radius: .5rem; }
+  .vehicle-list { max-height: calc(100vh - 230px); overflow-y: auto; }
+  .vehicle-list .list-group-item { cursor: pointer; }
+  .legend-dot { display: inline-block; width: .7rem; height: .7rem; border-radius: 50%; margin-right: .25rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+  <div>
+    <h1 class="h3 mb-0">Live monitoring</h1>
+    <p class="text-muted mb-0 small">Updates every 5 seconds · last update <span id="updated">—</span></p>
+  </div>
+  <div class="d-flex flex-wrap gap-3 small" id="summary" aria-live="polite"></div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-9">
+    <div id="fleet-map" class="shadow-sm" aria-label="Map of fleet vehicles"></div>
+    <div class="small text-muted mt-2" id="legend"></div>
+  </div>
+  <div class="col-lg-3">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white fw-semibold">Vehicles</div>
+      <div class="list-group list-group-flush vehicle-list" id="vehicle-list">
+        <div class="list-group-item text-muted">Loading…</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(() => {
+  const FEED_URL = {{ url_for('monitoring.fleet_json')|tojson }};
+  // Keep in sync with the state_badge macro in _macros.html.
+  const STATE_STYLES = {
+    moving:   { color: "#198754", label: "Moving" },
+    idle:     { color: "#6c757d", label: "Idle" },
+    charging: { color: "#0d6efd", label: "Charging" },
+    offline:  { color: "#212529", label: "Offline" },
+    no_data:  { color: "#adb5bd", label: "No data" },
+  };
+  const LOW_BATTERY_COLOR = "#fd7e14";
+
+  const escapeHtml = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const fmt = (n, digits = 0) => (n === null || n === undefined ? "—" : Number(n).toFixed(digits));
+
+  const map = L.map("fleet-map").setView([22.5, 79], 5);  // India
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19, attribution: "&copy; OpenStreetMap contributors",
+  }).addTo(map);
+
+  document.getElementById("legend").innerHTML =
+    Object.values(STATE_STYLES).map((s) => `<span class="me-3"><span class="legend-dot" style="background:${s.color}"></span>${s.label}</span>`).join("") +
+    `<span><span class="legend-dot" style="background:${LOW_BATTERY_COLOR}"></span>Ring = battery below 20%</span>`;
+
+  const markers = new Map();
+  let fittedOnce = false;
+
+  function popupHtml(v) {
+    const style = STATE_STYLES[v.state] || STATE_STYLES.no_data;
+    return `<strong>${escapeHtml(v.plate)}</strong> · ${escapeHtml(v.name)}<br>
+      ${style.label}${v.driver ? " · " + escapeHtml(v.driver) : ""}<br>
+      Battery ${fmt(v.soc_pct)}% · range ≈ ${fmt(v.range_km)} km<br>
+      Speed ${fmt(v.speed_kmh)} km/h · ${fmt(v.battery_temp_c, 1)} °C<br>
+      <a href="${escapeHtml(v.url)}">Details →</a>`;
+  }
+
+  function render({ summary, vehicles }) {
+    document.getElementById("summary").innerHTML = [
+      ["Total", summary.total], ["Moving", summary.moving], ["Charging", summary.charging],
+      ["Offline", summary.offline], ["Low battery", summary.low_battery],
+      ["Avg charge", summary.avg_soc_pct === null ? "—" : summary.avg_soc_pct + "%"],
+    ].map(([k, v]) => `<span><span class="text-muted">${k}</span> <strong>${v}</strong></span>`).join("");
+
+    const seen = new Set();
+    for (const v of vehicles) {
+      if (v.lat === null || v.lon === null) continue;
+      seen.add(v.id);
+      const style = STATE_STYLES[v.state] || STATE_STYLES.no_data;
+      const options = {
+        radius: 9, weight: v.low_battery ? 4 : 2,
+        color: v.low_battery ? LOW_BATTERY_COLOR : "#ffffff",
+        fillColor: style.color, fillOpacity: 0.95,
+      };
+      let marker = markers.get(v.id);
+      if (!marker) {
+        marker = L.circleMarker([v.lat, v.lon], options).addTo(map).bindPopup("");
+        markers.set(v.id, marker);
+      }
+      marker.setLatLng([v.lat, v.lon]).setStyle(options);
+      marker.setPopupContent(popupHtml(v));
+      marker.bindTooltip(v.plate, { direction: "top", offset: [0, -8] });
+    }
+    for (const [id, marker] of markers) {
+      if (!seen.has(id)) { marker.remove(); markers.delete(id); }
+    }
+    if (!fittedOnce && markers.size) {
+      map.fitBounds(L.featureGroup([...markers.values()]).getBounds(), { padding: [30, 30], maxZoom: 13 });
+      fittedOnce = true;
+    }
+
+    const list = document.getElementById("vehicle-list");
+    list.innerHTML = vehicles.length ? "" : '<div class="list-group-item text-muted">No vehicles to show.</div>';
+    for (const v of vehicles) {
+      const style = STATE_STYLES[v.state] || STATE_STYLES.no_data;
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "list-group-item list-group-item-action";
+      item.innerHTML = `<div class="d-flex justify-content-between">
+          <strong>${escapeHtml(v.plate)}</strong>
+          <span class="badge" style="background:${style.color}">${style.label}</span></div>
+        <div class="small text-muted">${escapeHtml(v.name)} · ${fmt(v.soc_pct)}%${v.low_battery ? ' <i class="bi bi-battery text-warning" title="Low battery"></i>' : ""}</div>`;
+      item.addEventListener("click", () => {
+        const m = markers.get(v.id);
+        if (m) { map.setView(m.getLatLng(), 15); m.openPopup(); } else { window.location = v.url; }
+      });
+      list.appendChild(item);
+    }
+    document.getElementById("updated").textContent = new Date().toLocaleTimeString();
+  }
+
+  async function refresh() {
+    try {
+      const resp = await fetch(FEED_URL, { headers: { Accept: "application/json" } });
+      if (resp.status === 401 || resp.redirected) { window.location.reload(); return; }
+      if (resp.ok) render(await resp.json());
+    } catch (err) {
+      console.warn("Fleet refresh failed", err);
+    }
+  }
+  refresh();
+  setInterval(refresh, 5000);
+})();
+</script>
+{% endblock %}

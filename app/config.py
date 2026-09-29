@@ -35,6 +35,23 @@ class Config:
         else "EV Fleet Monitor <no-reply@localhost>"
     )
 
+    # Display timezone (timestamps are stored in UTC)
+    APP_TIMEZONE = os.environ.get("APP_TIMEZONE", "Asia/Kolkata")
+
+    # Telemetry
+    OFFLINE_AFTER_SECONDS = 120  # no reading for this long -> vehicle shown as offline
+    TELEMETRY_RETENTION_DAYS = int(os.environ.get("TELEMETRY_RETENTION_DAYS", "7"))
+    TELEMETRY_MAX_BATCH = 100
+
+    # Built-in telemetry simulator (stands in for real vehicle devices)
+    SIMULATOR_ENABLED = os.environ.get("SIMULATOR_ENABLED", "true").lower() == "true"
+    SIMULATOR_INTERVAL_SECONDS = float(os.environ.get("SIMULATOR_INTERVAL_SECONDS", "5"))
+    # Each real interval simulates this many times as much driving (12 -> 5 s becomes 1 min).
+    SIMULATOR_TIME_SCALE = float(os.environ.get("SIMULATOR_TIME_SCALE", "12"))
+
+    # Wait up to 15 s for a lock instead of failing when two writers overlap (SQLite only).
+    SQLALCHEMY_ENGINE_OPTIONS = {"connect_args": {"timeout": 15}}
+
     @staticmethod
     def database_url(default: str) -> str:
         url = os.environ.get("DATABASE_URL") or default
@@ -58,6 +75,7 @@ class TestingConfig(Config):
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
     WTF_CSRF_ENABLED = False
     MAIL_SERVER = ""  # never send real email from tests
+    SIMULATOR_ENABLED = False
 
 
 class ProductionConfig(Config):
@@ -66,6 +84,10 @@ class ProductionConfig(Config):
     REMEMBER_COOKIE_SECURE = True
     SQLALCHEMY_DATABASE_URI = Config.database_url(
         f"sqlite:///{BASE_DIR / 'instance' / 'ev_fleet.db'}"
+    )
+    # The SQLite `timeout` argument isn't valid for other drivers (e.g. PostgreSQL).
+    SQLALCHEMY_ENGINE_OPTIONS = (
+        Config.SQLALCHEMY_ENGINE_OPTIONS if SQLALCHEMY_DATABASE_URI.startswith("sqlite") else {}
     )
 
 

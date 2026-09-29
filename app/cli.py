@@ -1,16 +1,93 @@
 """Custom `flask` commands, e.g. `flask create-admin`."""
 
+import random
 import smtplib
 
 import click
 from flask import Flask
 
 from app.extensions import db
-from app.models import Role, User
+from app.models import Role, User, Vehicle
 from app.services.email import send_email
+
+# (make, model, battery kWh, km per kWh): popular EVs in India, real-world figures.
+DEMO_MODELS = [
+    ("Tata", "Nexon EV", 40.5, 7.0),
+    ("Tata", "Tigor EV", 26.0, 7.5),
+    ("MG", "ZS EV", 50.3, 6.5),
+    ("Mahindra", "XUV400", 39.4, 6.8),
+    ("Hyundai", "Kona Electric", 39.2, 7.2),
+    ("BYD", "e6", 71.7, 6.0),
+    ("Tata", "Ace EV", 21.3, 6.2),
+    ("Citroen", "eC3", 29.2, 7.3),
+]
+# State codes matching the simulator's cities (Delhi, Karnataka, Maharashtra, WB, Telangana).
+DEMO_STATE_CODES = ["DL", "KA", "MH", "WB", "TS"]
 
 
 def register_cli(app: Flask) -> None:
+    @app.cli.command("seed-vehicles")
+    @click.option("--count", default=6, show_default=True, help="How many demo EVs to add.")
+    def seed_vehicles(count: int) -> None:
+        """Add demo EVs (simulated) so the dashboards have something to show."""
+        rng = random.Random()
+        drivers = (
+            db.session.execute(db.select(User).where(User.role == Role.DRIVER)).scalars().all()
+        )
+        added = 0
+        while added < count:
+            make, model, kwh, eff = rng.choice(DEMO_MODELS)
+            plate = (
+                f"{rng.choice(DEMO_STATE_CODES)}{rng.randint(1, 99):02d}"
+                f"{rng.choice('ABCDEFGHJKLMNPRSTUVWXYZ')}{rng.choice('ABCDEFGHJKLMNPRSTUVWXYZ')}"
+                f"{rng.randint(1000, 9999)}"
+            )
+            if db.session.execute(db.select(Vehicle.id).filter_by(plate_number=plate)).first():
+                continue
+            vehicle = Vehicle(
+                make=make,
+                model=model,
+                year=rng.randint(2021, 2026),
+                plate_number=plate,
+                battery_capacity_kwh=kwh,
+                efficiency_km_per_kwh=eff,
+                driver_id=drivers[added % len(drivers)].id if drivers else None,
+            )
+            vehicle.issue_api_key()  # unused by simulated vehicles; rotate in the UI when needed
+            db.session.add(vehicle)
+            added += 1
+        db.session.commit()
+        click.echo(f"Added {added} demo vehicles.")
+
+    @app.cli.command("simulate")
+    @click.option("--once", is_flag=True, help="Run a single tick and exit.")
+    def simulate(once: bool) -> None:
+        """Run the telemetry simulator in this terminal (Ctrl+C to stop).
+
+        Use this when the web server's built-in simulator is disabled
+        (SIMULATOR_ENABLED=false), e.g. to run it as a separate process in production.
+        """
+        from app.services.simulator import FleetSimulator
+
+        sim = FleetSimulator(app)
+        if once:
+            click.echo(f"Recorded {sim.step()} readings.")
+            return
+        try:
+            sim.run_forever()
+        except KeyboardInterrupt:
+            click.echo("Simulator stopped.")
+
+    @app.cli.command("prune-telemetry")
+    @click.option("--days", type=int, help="Keep this many days (default: retention setting).")
+    def prune_telemetry(days: int | None) -> None:
+        """Delete telemetry readings older than the retention period."""
+        from app.services.telemetry import prune_old_telemetry
+
+        removed = prune_old_telemetry(days or app.config["TELEMETRY_RETENTION_DAYS"])
+        db.session.commit()
+        click.echo(f"Removed {removed} readings.")
+
     @app.cli.command("create-admin")
     @click.option("--email", prompt=True, help="Admin email address.")
     @click.option("--name", prompt=True, help="Admin full name.")

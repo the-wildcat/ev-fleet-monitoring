@@ -16,6 +16,32 @@
   {% endif %}
 {% endmacro %}
 
+{# Live-state badge; keep labels/colours in sync with STATE_STYLES in monitoring/live.html. #}
+{% macro state_badge(state) %}
+  {% set styles = {
+    "moving": ("success", "Moving"), "idle": ("secondary", "Idle"),
+    "charging": ("primary", "Charging"), "offline": ("dark", "Offline"),
+    "no_data": ("light", "No data"),
+  } %}
+  {% set colour, label = styles.get(state, ("light", state)) %}
+  <span class="badge text-bg-{{ colour }}">{{ label }}</span>
+{% endmacro %}
+
+{# Battery percentage with a coloured bar. #}
+{% macro battery(soc) %}
+  {% if soc is none %}
+    <span class="text-muted">—</span>
+  {% else %}
+    {% set colour = "danger" if soc < 20 else ("warning" if soc < 40 else "success") %}
+    <div class="d-flex align-items-center gap-2" style="min-width: 110px">
+      <div class="progress flex-grow-1" style="height: 8px" role="progressbar" aria-valuenow="{{ soc|round|int }}" aria-valuemin="0" aria-valuemax="100" aria-label="Battery">
+        <div class="progress-bar bg-{{ colour }}" style="width: {{ soc }}%"></div>
+      </div>
+      <small>{{ soc|round|int }}%</small>
+    </div>
+  {% endif %}
+{% endmacro %}
+
 {# Centered card used by all the auth pages. #}
 {% macro auth_card(title) %}
   <div class="row justify-content-center">

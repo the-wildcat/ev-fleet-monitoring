@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% from "_macros.html" import state_badge, battery %}
+{% block title %}Vehicles{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+  <div>
+    <h1 class="h3 mb-0">Vehicles</h1>
+    <p class="text-muted mb-0">
+      {{ vehicles|length }} vehicle{{ "s" if vehicles|length != 1 }}{{ " assigned to you" if not current_user.is_manager }}
+    </p>
+  </div>
+  {% if current_user.is_manager %}
+    <a class="btn btn-success" href="{{ url_for('vehicles.create_vehicle') }}"><i class="bi bi-plus-lg"></i> Register EV</a>
+  {% endif %}
+</div>
+
+<div class="card shadow-sm">
+  {% if vehicles %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr><th>Registration</th><th>Vehicle</th><th>Battery size</th><th>Driver</th><th>Status</th><th>Live</th><th>Charge</th><th>Last seen</th></tr>
+        </thead>
+        <tbody>
+          {% for v in vehicles %}
+            <tr>
+              <td><a href="{{ url_for('vehicles.vehicle_detail', vehicle_id=v.id) }}" class="fw-semibold">{{ v.plate_number }}</a></td>
+              <td>{{ v.display_name }}{% if v.year %} <span class="text-muted small">({{ v.year }})</span>{% endif %}</td>
+              <td>{{ v.battery_capacity_kwh }} kWh</td>
+              <td>{{ v.driver.name if v.driver else "—" }}</td>
+              <td><span class="badge text-bg-{{ {'active': 'success', 'in_service': 'warning', 'inactive': 'secondary'}[v.status.value] }}">{{ v.status.label }}</span></td>
+              <td>{{ state_badge(v.live_state(offline_after)) }}</td>
+              <td>{{ battery(v.last_soc_pct) }}</td>
+              <td class="small text-muted">{{ v.last_seen_at|localtime("%d %b, %H:%M:%S") }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="card-body text-muted">
+      {% if current_user.is_manager %}
+        No vehicles registered yet. <a href="{{ url_for('vehicles.create_vehicle') }}">Register your first EV</a>,
+        or run <code>flask seed-vehicles</code> to add demo vehicles.
+      {% else %}
+        No vehicles are assigned to you yet.
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -6,6 +6,8 @@ which lets tests, the CLI and the WSGI server each create their own instance.
 
 import logging
 import os
+from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
 from flask import Flask
 
@@ -39,19 +41,51 @@ def create_app(config_name: str | None = None) -> Flask:
 
     from app import models  # noqa: F401  (register tables and the user loader)
     from app.admin import bp as admin_bp
+    from app.api import bp as api_bp
     from app.auth import bp as auth_bp
     from app.cli import register_cli
     from app.errors import register_error_handlers
     from app.main import bp as main_bp
+    from app.monitoring import bp as monitoring_bp
+    from app.vehicles import bp as vehicles_bp
 
-    app.register_blueprint(main_bp)
-    app.register_blueprint(auth_bp)
-    app.register_blueprint(admin_bp)
+    for blueprint in (main_bp, auth_bp, admin_bp, vehicles_bp, monitoring_bp, api_bp):
+        app.register_blueprint(blueprint)
     register_error_handlers(app)
     register_cli(app)
+    _register_template_filters(app)
+    _start_simulator_on_first_request(app)
 
     app.logger.info("App started (env=%s)", config_name)
     return app
+
+
+def _register_template_filters(app: Flask) -> None:
+    tz = ZoneInfo(app.config["APP_TIMEZONE"])
+
+    @app.template_filter("localtime")
+    def localtime(value: datetime | None, fmt: str = "%d %b %Y, %H:%M") -> str:
+        """Render a stored naive-UTC datetime in the display timezone (IST by default)."""
+        if value is None:
+            return "—"
+        return value.replace(tzinfo=UTC).astimezone(tz).strftime(fmt)
+
+
+def _start_simulator_on_first_request(app: Flask) -> None:
+    """Start the telemetry simulator when the web server handles its first request.
+
+    Starting it here (rather than in create_app) means CLI commands such as
+    `flask db upgrade` never spawn it, and with the debug reloader only the serving
+    process runs it.
+    """
+    if not app.config["SIMULATOR_ENABLED"] or app.testing:
+        return
+
+    @app.before_request
+    def _ensure_simulator() -> None:
+        from app.services.simulator import start_background_simulator
+
+        start_background_simulator(app)
 
 
 def _configure_logging(app: Flask) -> None:

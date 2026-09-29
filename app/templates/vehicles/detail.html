@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% from "_macros.html" import field, state_badge, battery %}
+{% block title %}{{ vehicle.plate_number }}{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-start mb-4 gap-2">
+  <div>
+    <a href="{{ url_for('vehicles.list_vehicles') }}" class="small text-decoration-none"><i class="bi bi-arrow-left"></i> Vehicles</a>
+    <h1 class="h3 mb-0">{{ vehicle.plate_number }}</h1>
+    <p class="text-muted mb-0">
+      {{ vehicle.display_name }}{% if vehicle.year %} · {{ vehicle.year }}{% endif %}
+      · {{ vehicle.status.label }}
+      · Driver: {{ vehicle.driver.name if vehicle.driver else "unassigned" }}
+    </p>
+  </div>
+  {% if current_user.is_manager %}
+    <a class="btn btn-outline-success" href="{{ url_for('vehicles.edit_vehicle', vehicle_id=vehicle.id) }}"><i class="bi bi-pencil"></i> Edit</a>
+  {% endif %}
+</div>
+
+{# --- live KPIs (refreshed by the script below) --- #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3"><div class="card shadow-sm h-100"><div class="card-body">
+    <div class="text-muted small">State</div><div id="kpi-state" class="fs-5">{{ state_badge(vehicle.live_state(offline_after)) }}</div>
+    <div class="small text-muted">Last seen <span id="kpi-seen">{{ vehicle.last_seen_at|localtime("%H:%M:%S") }}</span></div>
+  </div></div></div>
+  <div class="col-6 col-lg-3"><div class="card shadow-sm h-100"><div class="card-body">
+    <div class="text-muted small">Battery</div><div id="kpi-soc" class="fs-5">{{ battery(vehicle.last_soc_pct) }}</div>
+    <div class="small text-muted">Range ≈ <span id="kpi-range">{{ "%.0f"|format(vehicle.range_km) if vehicle.range_km is not none else "—" }}</span> km</div>
+  </div></div></div>
+  <div class="col-6 col-lg-3"><div class="card shadow-sm h-100"><div class="card-body">
+    <div class="text-muted small">Speed</div><div class="fs-4 fw-semibold"><span id="kpi-speed">{{ "%.0f"|format(vehicle.last_speed_kmh) if vehicle.last_speed_kmh is not none else "—" }}</span> <small class="fs-6">km/h</small></div>
+  </div></div></div>
+  <div class="col-6 col-lg-3"><div class="card shadow-sm h-100"><div class="card-body">
+    <div class="text-muted small">Battery temp · Odometer</div>
+    <div class="fs-5"><span id="kpi-temp">{{ "%.1f"|format(vehicle.last_battery_temp_c) if vehicle.last_battery_temp_c is not none else "—" }}</span> °C</div>
+    <div class="small text-muted"><span id="kpi-odo">{{ "{:,.0f}".format(vehicle.odometer_km or 0) }}</span> km</div>
+  </div></div></div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-lg-5">
+    <div class="card shadow-sm h-100">
+      <div class="card-header bg-white fw-semibold">Last hour: route</div>
+      <div id="track-map" style="height: 320px" aria-label="Map of the vehicle's recent route"></div>
+    </div>
+  </div>
+  <div class="col-lg-7">
+    <div class="card shadow-sm h-100">
+      <div class="card-header bg-white fw-semibold">Last hour: speed and battery</div>
+      <div class="card-body"><canvas id="history-chart" height="140" aria-label="Speed and battery chart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card shadow-sm" id="service">
+      <div class="card-header bg-white fw-semibold">Service history</div>
+      {% if vehicle.service_records %}
+        <div class="table-responsive">
+          <table class="table align-middle mb-0">
+            <thead class="table-light"><tr><th>Date</th><th>Type</th><th>Odometer</th><th>Cost</th><th>Work done</th>{% if current_user.is_manager %}<th></th>{% endif %}</tr></thead>
+            <tbody>
+              {% for r in vehicle.service_records %}
+                <tr>
+                  <td>{{ r.service_date.strftime("%d %b %Y") }}</td>
+                  <td>{{ r.service_type.label }}</td>
+                  <td>{{ "{:,.0f} km".format(r.odometer_km) if r.odometer_km is not none else "—" }}</td>
+                  <td>{{ "₹{:,.0f}".format(r.cost_inr) if r.cost_inr is not none else "—" }}</td>
+                  <td class="small">{{ r.description or "—" }}</td>
+                  {% if current_user.is_manager %}
+                    <td class="text-end">
+                      <form method="post" action="{{ url_for('vehicles.delete_service_record', vehicle_id=vehicle.id, record_id=r.id) }}">
+                        {{ confirm_form.csrf_token }}
+                        <button class="btn btn-sm btn-link text-danger" aria-label="Delete record"><i class="bi bi-trash"></i></button>
+                      </form>
+                    </td>
+                  {% endif %}
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="card-body text-muted">No service records yet.</div>
+      {% endif %}
+
+      {% if current_user.is_manager %}
+        <div class="card-body border-top">
+          <h2 class="h6">Add a service record</h2>
+          <form method="post" action="{{ url_for('vehicles.add_service_record', vehicle_id=vehicle.id) }}" novalidate>
+            {{ service_form.hidden_tag() }}
+            <div class="row">
+              <div class="col-md-4">{{ field(service_form.service_date) }}</div>
+              <div class="col-md-4">{{ field(service_form.service_type) }}</div>
+              <div class="col-md-4">{{ field(service_form.odometer_km) }}</div>
+            </div>
+            <div class="row">
+              <div class="col-md-4">{{ field(service_form.cost_inr) }}</div>
+              <div class="col-md-8">{{ field(service_form.description) }}</div>
+            </div>
+            {{ service_form.submit(class_="btn btn-success") }}
+          </form>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card shadow-sm mb-3">
+      <div class="card-header bg-white fw-semibold">Specifications</div>
+      <div class="card-body">
+        <dl class="row mb-0 small">
+          <dt class="col-6">Battery</dt><dd class="col-6">{{ vehicle.battery_capacity_kwh }} kWh</dd>
+          <dt class="col-6">Efficiency</dt><dd class="col-6">{{ vehicle.efficiency_km_per_kwh }} km/kWh</dd>
+          <dt class="col-6">Full-charge range</dt><dd class="col-6">≈ {{ "%.0f"|format(vehicle.battery_capacity_kwh * vehicle.efficiency_km_per_kwh) }} km</dd>
+          <dt class="col-6">VIN</dt><dd class="col-6 text-break">{{ vehicle.vin or "—" }}</dd>
+          <dt class="col-6">Data source</dt><dd class="col-6">{{ "Simulator" if vehicle.simulated else "Device API" }}</dd>
+          <dt class="col-6">Registered</dt><dd class="col-6">{{ vehicle.created_at|localtime("%d %b %Y") }}</dd>
+        </dl>
+      </div>
+    </div>
+
+    {% if current_user.is_manager %}
+      <div class="card shadow-sm border-danger-subtle">
+        <div class="card-header bg-white fw-semibold">Device &amp; danger zone</div>
+        <div class="card-body">
+          <p class="small mb-2">API key: <code>{{ vehicle.api_key_prefix or "none" }}…</code></p>
+          <form method="post" action="{{ url_for('vehicles.regenerate_api_key', vehicle_id=vehicle.id) }}" class="mb-3">
+            {{ confirm_form.csrf_token }}
+            <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-key"></i> Generate new API key</button>
+            <div class="form-text">The old key stops working immediately.</div>
+          </form>
+          <form method="post" action="{{ url_for('vehicles.delete_vehicle', vehicle_id=vehicle.id) }}">
+            {{ confirm_form.csrf_token }}
+            <label for="confirm_plate" class="form-label small">Delete this vehicle and all its data. Type <strong>{{ vehicle.plate_number }}</strong> to confirm:</label>
+            <div class="input-group input-group-sm">
+              <input id="confirm_plate" name="confirm_plate" class="form-control" autocomplete="off">
+              <button class="btn btn-danger">Delete</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+(() => {
+  const dataUrl = {{ url_for('vehicles.vehicle_telemetry', vehicle_id=vehicle.id, minutes=60)|tojson }};
+  const fmtTime = (iso) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
+  const map = L.map("track-map").setView([{{ vehicle.last_lat or 22.5 }}, {{ vehicle.last_lon or 79 }}], {{ 13 if vehicle.last_lat else 4 }});
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19, attribution: "&copy; OpenStreetMap contributors",
+  }).addTo(map);
+  const track = L.polyline([], { color: "#2e7d32", weight: 4 }).addTo(map);
+  const marker = L.circleMarker([0, 0], { radius: 8, color: "#1b5e20", fillOpacity: 0.9 });
+
+  const chart = new Chart(document.getElementById("history-chart"), {
+    type: "line",
+    data: { labels: [], datasets: [
+      { label: "Speed (km/h)", data: [], borderColor: "#1976d2", yAxisID: "speed", pointRadius: 0, tension: 0.3 },
+      { label: "Battery (%)", data: [], borderColor: "#2e7d32", yAxisID: "soc", pointRadius: 0, tension: 0.3 },
+    ] },
+    options: {
+      animation: false, interaction: { mode: "index", intersect: false },
+      scales: {
+        speed: { position: "left", beginAtZero: true, title: { display: true, text: "km/h" } },
+        soc: { position: "right", min: 0, max: 100, grid: { drawOnChartArea: false }, title: { display: true, text: "%" } },
+      },
+    },
+  });
+
+  let fitted = false;
+  async function refresh() {
+    try {
+      const resp = await fetch(dataUrl, { headers: { Accept: "application/json" } });
+      if (!resp.ok) return;
+      const { readings } = await resp.json();
+      if (!readings.length) return;
+
+      chart.data.labels = readings.map((r) => fmtTime(r.recorded_at));
+      chart.data.datasets[0].data = readings.map((r) => r.speed_kmh);
+      chart.data.datasets[1].data = readings.map((r) => r.soc_pct);
+      chart.update();
+
+      const points = readings.map((r) => [r.lat, r.lon]);
+      track.setLatLngs(points);
+      marker.setLatLng(points[points.length - 1]).addTo(map);
+      if (!fitted) { map.fitBounds(track.getBounds(), { padding: [20, 20], maxZoom: 15 }); fitted = true; }
+
+      const last = readings[readings.length - 1];
+      document.getElementById("kpi-speed").textContent = Math.round(last.speed_kmh);
+      document.getElementById("kpi-seen").textContent = fmtTime(last.recorded_at);
+      if (last.battery_temp_c !== null) document.getElementById("kpi-temp").textContent = last.battery_temp_c.toFixed(1);
+      if (last.odometer_km !== null) document.getElementById("kpi-odo").textContent = Math.round(last.odometer_km).toLocaleString();
+      const soc = document.querySelector("#kpi-soc small");
+      const bar = document.querySelector("#kpi-soc .progress-bar");
+      if (soc && bar) { soc.textContent = Math.round(last.soc_pct) + "%"; bar.style.width = last.soc_pct + "%"; }
+      const range = {{ vehicle.battery_capacity_kwh }} * last.soc_pct / 100 * {{ vehicle.efficiency_km_per_kwh }};
+      document.getElementById("kpi-range").textContent = Math.round(range);
+    } catch (err) {
+      console.warn("Telemetry refresh failed", err);
+    }
+  }
+  refresh();
+  setInterval(refresh, 10000);
+})();
+</script>
+{% endblock %}
