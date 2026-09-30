@@ -7,7 +7,17 @@ from flask_login import current_user, login_required
 
 from app.auth.decorators import role_required
 from app.extensions import db
-from app.models import Role, ServiceRecord, ServiceType, Telemetry, User, Vehicle, VehicleStatus
+from app.models import (
+    Alert,
+    BatteryCheck,
+    Role,
+    ServiceRecord,
+    ServiceType,
+    Telemetry,
+    User,
+    Vehicle,
+    VehicleStatus,
+)
 from app.utils import utcnow
 from app.vehicles import bp
 from app.vehicles.access import get_visible_vehicle, visible_vehicles_stmt
@@ -132,17 +142,33 @@ def delete_vehicle(vehicle_id: int):
 # --- detail, telemetry history ----------------------------------------------------------------
 
 
-@bp.route("/<int:vehicle_id>")
-@login_required
-def vehicle_detail(vehicle_id: int):
-    vehicle = get_visible_vehicle(vehicle_id)
+def _render_detail(vehicle: Vehicle, service_form: ServiceRecordForm):
+    open_alerts = db.session.execute(
+        db.select(Alert)
+        .filter_by(vehicle_id=vehicle.id, resolved_at=None)
+        .order_by(Alert.created_at.desc())
+    ).scalars()
+    battery_checks = db.session.execute(
+        db.select(BatteryCheck)
+        .filter_by(vehicle_id=vehicle.id)
+        .order_by(BatteryCheck.created_at.desc())
+        .limit(10)
+    ).scalars()
     return render_template(
         "vehicles/detail.html",
         vehicle=vehicle,
-        service_form=ServiceRecordForm(),
+        service_form=service_form,
         confirm_form=ConfirmForm(),
+        open_alerts=list(open_alerts),
+        battery_checks=list(battery_checks),
         offline_after=current_app.config["OFFLINE_AFTER_SECONDS"],
     )
+
+
+@bp.route("/<int:vehicle_id>")
+@login_required
+def vehicle_detail(vehicle_id: int):
+    return _render_detail(get_visible_vehicle(vehicle_id), ServiceRecordForm())
 
 
 @bp.route("/<int:vehicle_id>/telemetry.json")
@@ -188,13 +214,7 @@ def add_service_record(vehicle_id: int):
         flash("Service record added.", "success")
         return redirect(url_for("vehicles.vehicle_detail", vehicle_id=vehicle.id) + "#service")
     # Re-render the page with the form errors shown.
-    return render_template(
-        "vehicles/detail.html",
-        vehicle=vehicle,
-        service_form=form,
-        confirm_form=ConfirmForm(),
-        offline_after=current_app.config["OFFLINE_AFTER_SECONDS"],
-    ), 400
+    return _render_detail(vehicle, form), 400
 
 
 @bp.route("/<int:vehicle_id>/services/<int:record_id>/delete", methods=["POST"])

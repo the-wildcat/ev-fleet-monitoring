@@ -1,0 +1,69 @@
+{
+  "model": "linear_regression",
+  "target": "Battery Health (%)",
+  "features": [
+    {
+      "name": "capacity_mah",
+      "column": "Battery Capacity (mAh)",
+      "unit": "mAh"
+    },
+    {
+      "name": "cycle_count",
+      "column": "Cycle Count",
+      "unit": "cycles"
+    },
+    {
+      "name": "voltage_v",
+      "column": "Voltage (V)",
+      "unit": "V"
+    },
+    {
+      "name": "temperature_c",
+      "column": "Temperature (\u00b0C)",
+      "unit": "\u00b0C"
+    },
+    {
+      "name": "internal_resistance_mohm",
+      "column": "Internal Resistance (m\u03a9)",
+      "unit": "m\u03a9"
+    }
+  ],
+  "status_bands": {
+    "Good": ">= 75",
+    "Fair": "50 - 75",
+    "Needs Replacement": "< 50"
+  },
+  "cv": "RepeatedKFold(n_splits=5, n_repeats=3)",
+  "metrics": {
+    "baseline_mean": {
+      "mae": 14.109,
+      "mae_std": 1.545,
+      "rmse": 16.229,
+      "r2": -0.065
+    },
+    "linear_regression": {
+      "mae": 0.002,
+      "mae_std": 0.0,
+      "rmse": 0.003,
+      "r2": 1.0,
+      "status_accuracy": 1.0
+    },
+    "random_forest": {
+      "mae": 2.472,
+      "mae_std": 0.461,
+      "rmse": 3.131,
+      "r2": 0.958
+    },
+    "gradient_boosting": {
+      "mae": 1.653,
+      "mae_std": 0.33,
+      "rmse": 2.053,
+      "r2": 0.982
+    }
+  },
+  "training_rows": 100,
+  "dataset": "Battery_Health_Dataset.xlsx",
+  "dataset_sha256": "c5ddf481900241592cba64cc3e6ed578bf63028298ba4e1d6cb4dc50d3f172e6",
+  "sklearn_version": "1.9.1",
+  "trained_at": "2026-10-04T09:43:49+00:00"
+}

@@ -43,14 +43,28 @@ def create_app(config_name: str | None = None) -> Flask:
     from app.admin import bp as admin_bp
     from app.api import bp as api_bp
     from app.auth import bp as auth_bp
+    from app.battery import bp as battery_bp
     from app.cli import register_cli
     from app.errors import register_error_handlers
     from app.main import bp as main_bp
     from app.monitoring import bp as monitoring_bp
+    from app.routing import bp as routing_bp
+    from app.services.battery_model import BatteryModel
     from app.vehicles import bp as vehicles_bp
 
-    for blueprint in (main_bp, auth_bp, admin_bp, vehicles_bp, monitoring_bp, api_bp):
+    for blueprint in (
+        main_bp,
+        auth_bp,
+        admin_bp,
+        vehicles_bp,
+        monitoring_bp,
+        routing_bp,
+        battery_bp,
+        api_bp,
+    ):
         app.register_blueprint(blueprint)
+    # Loaded lazily on the first prediction, then shared by all requests.
+    app.extensions["battery_model"] = BatteryModel(app.config["BATTERY_MODEL_PATH"])
     register_error_handlers(app)
     register_cli(app)
     _register_template_filters(app)

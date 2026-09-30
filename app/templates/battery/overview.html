@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% from "_macros.html" import field, battery, state_badge, alert_row, soh_badge %}
+{% block title %}Battery health{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-1">Battery health</h1>
+<p class="text-muted mb-4">Live charge and temperature, predicted battery wear (state of health), and battery alerts.</p>
+
+<div class="row g-4">
+  <div class="col-xl-8">
+    <div class="card shadow-sm mb-4">
+      <div class="card-header bg-white fw-semibold d-flex justify-content-between">
+        <span>Active battery alerts</span>
+        <span class="badge text-bg-{{ 'danger' if alerts else 'success' }}">{{ alerts|length }}</span>
+      </div>
+      {% if alerts %}
+        <ul class="list-group list-group-flush">
+          {% for alert in alerts %}<li class="list-group-item">{{ alert_row(alert) }}</li>{% endfor %}
+        </ul>
+      {% else %}
+        <div class="card-body text-muted"><i class="bi bi-check-circle text-success"></i> No battery problems right now.</div>
+      {% endif %}
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="card-header bg-white fw-semibold">Fleet batteries</div>
+      {% if vehicles %}
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light"><tr><th>Vehicle</th><th>State</th><th>Charge</th><th>Temp</th><th>Range</th><th>Health (last check)</th></tr></thead>
+            <tbody>
+              {% for v in vehicles %}
+                {% set check = latest_checks.get(v.id) %}
+                <tr>
+                  <td><a href="{{ url_for('vehicles.vehicle_detail', vehicle_id=v.id) }}">{{ v.plate_number }}</a><div class="small text-muted">{{ v.display_name }}</div></td>
+                  <td>{{ state_badge(v.live_state(offline_after)) }}</td>
+                  <td>{{ battery(v.last_soc_pct) }}</td>
+                  <td class="{{ 'text-danger fw-semibold' if v.last_battery_temp_c and v.last_battery_temp_c >= config.ALERT_OVERHEAT_C }}">
+                    {{ "%.1f °C"|format(v.last_battery_temp_c) if v.last_battery_temp_c is not none else "—" }}</td>
+                  <td>{{ "%.0f km"|format(v.range_km) if v.range_km is not none else "—" }}</td>
+                  <td>
+                    {% if check %}{{ soh_badge(check.predicted_soh_pct, check.status) }}
+                      <div class="small text-muted">{{ check.created_at|localtime("%d %b %Y") }}</div>
+                    {% else %}<span class="text-muted small">No check yet</span>{% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="card-body text-muted">No vehicles to show.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="col-xl-4">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white fw-semibold">Battery health check (ML)</div>
+      <div class="card-body">
+        <p class="small text-muted">Enter readings from a battery diagnostic test to predict its state of health.</p>
+        {% if prediction %}
+          <div class="alert alert-info">
+            Predicted health: <strong>{{ "%.1f"|format(prediction.soh_pct) }}%</strong> {{ soh_badge(prediction.soh_pct, prediction.status) }}
+          </div>
+        {% endif %}
+        <form method="post" novalidate>
+          {{ form.hidden_tag() }}
+          {% for name, column, unit, lo, hi in features %}{{ field(form[name]) }}{% endfor %}
+          {% if current_user.is_manager %}{{ field(form.vehicle_id) }}{% endif %}
+          {{ form.submit(class_="btn btn-success w-100") }}
+        </form>
+        {% if model_meta %}
+          {% set m = model_meta.metrics[model_meta.model] %}
+          <p class="small text-muted mt-3 mb-0">
+            Model: {{ model_meta.model|replace("_", " ") }} · cross-validated error ±{{ "%.2f"|format(m.mae) }}% ·
+            trained on {{ model_meta.training_rows }} batteries. Health bands: Good ≥ 75%, Fair 50–75%, Replace &lt; 50%.
+          </p>
+        {% else %}
+          <p class="small text-danger mt-3 mb-0">Model not trained yet: run <code>python -m ml.train_battery_model</code>.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

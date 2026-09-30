@@ -3,9 +3,9 @@
 Real-Time EV Fleet Monitoring and Predictive Analytics Solution, an Infosys Springboard
 internship project being rebuilt module by module to production standards.
 
-> **Status:** Phase 0 (foundation), Module 1 (authentication and roles) and Module 2 (EV
-> registration and real-time monitoring) are complete. Modules 3–6 are in progress; see the
-> roadmap below. Full documentation will be added in the delivery phase.
+> **Status:** Phase 0 (foundation) and Modules 1–3 (authentication and roles; EV registration
+> and real-time monitoring; route optimisation and battery health) are complete. Modules 4–6
+> are in progress; see the roadmap below. Full documentation will be added in the delivery phase.
 
 ## Quick start (Windows / PowerShell)
 
@@ -80,6 +80,40 @@ Responses: `201 {"accepted": n}`; `400` with per-field errors; `401` bad key; `4
 Readings older than `TELEMETRY_RETENTION_DAYS` (default 7) are pruned automatically, or with
 `flask prune-telemetry`.
 
+## Route planner
+
+`/routes/plan` plans a trip for a fleet vehicle (or a custom EV) from a place name, coordinates
+or the vehicle's current location:
+
+1. Places are found with OpenStreetMap **Nominatim**; road routes, including alternatives, come
+   from **OSRM**. Both are free and need no API key; set `NOMINATIM_URL` / `OSRM_URL` to use your
+   own instances. If OSRM is unreachable the planner falls back to a clearly labelled
+   straight-line estimate.
+2. Charging stations within a chosen distance of each route are found from
+   `data/India_EV_Charging_Stations.csv`. The raw file is cleaned on load: swapped
+   coordinates fixed, invalid ones and 324 duplicates dropped, leaving 1,214 stations.
+3. Stops are chosen greedily: drive as far as the battery allows while keeping a reserve, charge
+   at the farthest reachable station, repeat. This minimises the number of stops.
+4. Every alternative route is planned and the quickest feasible one (driving + charging) is
+   recommended. If none works, the planner explains why and checks whether charging to 100% would.
+
+## Battery health and alerts
+
+- **ML health check** (`/battery`): predicts state of health (SoH) from a diagnostic reading;
+  managers can save results to a vehicle's battery history. Train with
+  `python -m ml.train_battery_model`; see [`ml/MODEL_CARD.md`](ml/MODEL_CARD.md) for the
+  method, results and limitations (the provided dataset is synthetic).
+- **Prediction API:** `POST /api/v1/predict/battery` with `capacity_mah`, `cycle_count`,
+  `voltage_v`, `temperature_c`, `internal_resistance_mohm` (or `{"inputs": [...]}`, up to 100).
+- **Alerts**, raised automatically and resolved when the condition clears (one open alert per
+  vehicle and type):
+
+| Alert | Warning | Critical | Clears when |
+|---|---|---|---|
+| Low battery | charge < 20% while not charging | < 10% | charging, or ≥ 25% |
+| Battery overheating | ≥ 45 °C | ≥ 55 °C | ≤ 42 °C |
+| Battery wear (from a saved check) | SoH < 75% | SoH < 50% | a later check ≥ 75% |
+
 ## Project layout
 
 ```
@@ -91,11 +125,15 @@ app/            Flask application (app factory, blueprints, templates, static fi
   admin/        user management for administrators
   vehicles/     EV registration, details, service history, device API keys
   monitoring/   live fleet map and its JSON feed
-  api/          versioned JSON API for devices (/api/v1)
-  services/     email, telemetry validation/storage, telemetry simulator
+  routing/      route planner page
+  battery/      battery health page (ML checks, alerts)
+  api/          versioned JSON API (/api/v1): telemetry ingest, battery prediction
+  services/     email, telemetry, simulator, alerts, routing, battery model
   main/         overview dashboard and /healthz endpoint
   cli.py        create-admin, set-role, send-test-email, seed-vehicles, simulate, prune-telemetry
 migrations/     database schema versions (Alembic via Flask-Migrate)
+ml/             model training script and model card
+models/         trained model + metadata (committed, so the app works without retraining)
 data/           datasets used by the app
 legacy/         original submission, kept for reference until each module is rebuilt
 tests/          pytest test suite
@@ -109,7 +147,7 @@ wsgi.py         entry point for `flask run` and gunicorn
 | 0 | Project foundation: structure, config, base layout, tests | Done |
 | 1 | User authentication, email verification, roles | Done |
 | 2 | EV registration and real-time monitoring | Done |
-| 3 | Route optimisation and battery health (ML) | Planned |
+| 3 | Route optimisation and battery health (ML) | Done |
 | 4 | Driver behaviour and maintenance alerts | Planned |
 | 5 | Energy and cost analysis | Planned |
 | 6 | Report generation | Planned |

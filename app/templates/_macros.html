@@ -27,6 +27,29 @@
   <span class="badge text-bg-{{ colour }}">{{ label }}</span>
 {% endmacro %}
 
+{# One open alert as a compact list row. #}
+{% macro alert_row(alert, show_vehicle=true) %}
+  {% set critical = alert.severity.value == "critical" %}
+  <div class="d-flex gap-2 align-items-start">
+    <i class="bi {{ 'bi-exclamation-octagon-fill text-danger' if critical else 'bi-exclamation-triangle-fill text-warning' }} mt-1"></i>
+    <div>
+      <strong>{{ alert.alert_type.label }}</strong>
+      <span class="badge {{ 'text-bg-danger' if critical else 'text-bg-warning' }}">{{ alert.severity.value|title }}</span>
+      {% if show_vehicle %}
+        · <a href="{{ url_for('vehicles.vehicle_detail', vehicle_id=alert.vehicle_id) }}">{{ alert.vehicle.plate_number }}</a>
+      {% endif %}
+      <div class="small">{{ alert.message }}</div>
+      <div class="small text-muted">Since {{ alert.created_at|localtime("%d %b, %H:%M") }}</div>
+    </div>
+  </div>
+{% endmacro %}
+
+{# Battery health (SoH) with its status colour. #}
+{% macro soh_badge(soh, status) %}
+  {% set colour = {"Good": "success", "Fair": "warning", "Needs Replacement": "danger"}.get(status, "secondary") %}
+  <span class="badge text-bg-{{ colour }}">{{ "%.0f"|format(soh) }}% · {{ status }}</span>
+{% endmacro %}
+
 {# Battery percentage with a coloured bar. #}
 {% macro battery(soc) %}
   {% if soc is none %}

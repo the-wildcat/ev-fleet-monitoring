@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import field, state_badge, battery %}
+{% from "_macros.html" import field, state_badge, battery, alert_row, soh_badge %}
 {% block title %}{{ vehicle.plate_number }}{% endblock %}
 
 {% block head %}
@@ -21,6 +21,15 @@
     <a class="btn btn-outline-success" href="{{ url_for('vehicles.edit_vehicle', vehicle_id=vehicle.id) }}"><i class="bi bi-pencil"></i> Edit</a>
   {% endif %}
 </div>
+
+{% if open_alerts %}
+  <div class="card border-warning shadow-sm mb-4">
+    <div class="card-header bg-warning-subtle fw-semibold">Active alerts</div>
+    <ul class="list-group list-group-flush">
+      {% for alert in open_alerts %}<li class="list-group-item">{{ alert_row(alert, show_vehicle=false) }}</li>{% endfor %}
+    </ul>
+  </div>
+{% endif %}
 
 {# --- live KPIs (refreshed by the script below) --- #}
 <div class="row g-3 mb-4">
@@ -112,6 +121,24 @@
   </div>
 
   <div class="col-lg-4">
+    <div class="card shadow-sm mb-3">
+      <div class="card-header bg-white fw-semibold d-flex justify-content-between">
+        <span>Battery health history</span>
+        <a class="small" href="{{ url_for('battery.overview') }}">Run a check</a>
+      </div>
+      {% if battery_checks %}
+        <ul class="list-group list-group-flush">
+          {% for c in battery_checks %}
+            <li class="list-group-item d-flex justify-content-between small">
+              <span>{{ c.created_at|localtime("%d %b %Y") }}</span>{{ soh_badge(c.predicted_soh_pct, c.status) }}
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="card-body small text-muted">No battery checks yet.</div>
+      {% endif %}
+    </div>
+
     <div class="card shadow-sm mb-3">
       <div class="card-header bg-white fw-semibold">Specifications</div>
       <div class="card-body">

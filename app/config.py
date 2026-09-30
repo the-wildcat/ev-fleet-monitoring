@@ -49,6 +49,25 @@ class Config:
     # Each real interval simulates this many times as much driving (12 -> 5 s becomes 1 min).
     SIMULATOR_TIME_SCALE = float(os.environ.get("SIMULATOR_TIME_SCALE", "12"))
 
+    # Alert thresholds
+    ALERT_LOW_SOC_PCT = 20.0
+    ALERT_CRITICAL_SOC_PCT = 10.0
+    ALERT_OVERHEAT_C = 45.0
+    ALERT_CRITICAL_OVERHEAT_C = 55.0
+
+    # Battery health model (see ml/MODEL_CARD.md)
+    BATTERY_MODEL_PATH = BASE_DIR / "models" / "battery_soh.joblib"
+
+    # Route planning: OpenStreetMap services (override to use self-hosted instances)
+    NOMINATIM_URL = os.environ.get("NOMINATIM_URL", "https://nominatim.openstreetmap.org")
+    OSRM_URL = os.environ.get("OSRM_URL", "https://router.project-osrm.org")
+    # Nominatim's usage policy requires an identifying User-Agent with contact details.
+    ROUTING_USER_AGENT = os.environ.get(
+        "ROUTING_USER_AGENT", "EVFleetMonitor/1.0 (Infosys Springboard project)"
+    )
+    ROUTING_TIMEOUT_SECONDS = 10
+    CHARGING_STATIONS_PATH = BASE_DIR / "data" / "India_EV_Charging_Stations.csv"
+
     # Wait up to 15 s for a lock instead of failing when two writers overlap (SQLite only).
     SQLALCHEMY_ENGINE_OPTIONS = {"connect_args": {"timeout": 15}}
 

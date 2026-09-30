@@ -1,5 +1,8 @@
 -r requirements.txt
 
+# Model training (reads the .xlsx dataset): python -m ml.train_battery_model
+openpyxl==3.1.5
+
 # Testing and code quality
 pytest==9.1.1
 pytest-cov==7.1.0

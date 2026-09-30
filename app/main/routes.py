@@ -5,6 +5,7 @@ from sqlalchemy import text
 from app.extensions import db
 from app.main import bp
 from app.monitoring.routes import fleet_summary, visible_snapshots
+from app.services.alerts import open_alerts_for
 
 
 @bp.route("/")
@@ -13,7 +14,10 @@ def index():
         return render_template("main/index.html")
     snapshots = visible_snapshots()
     return render_template(
-        "main/dashboard.html", summary=fleet_summary(snapshots), vehicles=snapshots
+        "main/dashboard.html",
+        summary=fleet_summary(snapshots),
+        vehicles=snapshots,
+        alerts=open_alerts_for([s["id"] for s in snapshots], limit=6),
     )
 
 

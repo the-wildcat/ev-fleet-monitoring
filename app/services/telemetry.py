@@ -10,6 +10,7 @@ from sqlalchemy import delete
 
 from app.extensions import db
 from app.models import Telemetry, Vehicle
+from app.services.alerts import evaluate_telemetry
 from app.utils import utcnow
 
 # field -> (required, min, max)
@@ -92,8 +93,9 @@ def record_reading(vehicle: Vehicle, data: dict) -> Telemetry:
     db.session.add(reading)
 
     # Devices may send buffered readings late or out of order; only newer ones update
-    # the vehicle's current state.
-    if vehicle.last_seen_at is None or reading.recorded_at >= vehicle.last_seen_at:
+    # the vehicle's current state (and only those are checked against alert rules).
+    is_latest = vehicle.last_seen_at is None or reading.recorded_at >= vehicle.last_seen_at
+    if is_latest:
         vehicle.last_lat = reading.lat
         vehicle.last_lon = reading.lon
         vehicle.last_speed_kmh = reading.speed_kmh
@@ -103,6 +105,8 @@ def record_reading(vehicle: Vehicle, data: dict) -> Telemetry:
         vehicle.last_seen_at = reading.recorded_at
     if reading.odometer_km is not None:
         vehicle.odometer_km = max(vehicle.odometer_km or 0.0, reading.odometer_km)
+    if is_latest:
+        evaluate_telemetry(vehicle, reading)
     return reading
 
 

@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% from "_macros.html" import field %}
+{% block title %}Route planner{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  #route-map { height: 460px; border-radius: .5rem; }
+  .stop-icon { background: #0d6efd; color: #fff; border: 2px solid #fff; border-radius: 50%;
+               width: 26px; height: 26px; line-height: 22px; text-align: center; font-weight: 600;
+               box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+</style>
+{% endblock %}
+
+{% macro duration(minutes) -%}
+  {%- set m = minutes|round|int -%}{{ m // 60 }} h {{ "%02d"|format(m % 60) }} min
+{%- endmacro %}
+
+{% block content %}
+<h1 class="h3 mb-1">Route planner</h1>
+<p class="text-muted mb-4">Road route with charging stops based on the battery level, using {{ "1,200+" }} charging stations across India.</p>
+
+<div class="row g-4">
+  <div class="col-xl-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <form method="post" novalidate id="plan-form">
+          {{ form.hidden_tag() }}
+          {% for error in form.form_errors %}
+            <div class="alert alert-danger py-2">{{ error }}</div>
+          {% endfor %}
+          {{ field(form.vehicle_id) }}
+          <div id="custom-specs" class="row">
+            <div class="col-6">{{ field(form.battery_capacity_kwh) }}</div>
+            <div class="col-6">{{ field(form.efficiency_km_per_kwh) }}</div>
+          </div>
+          {{ field(form.use_vehicle_location) }}
+          <div id="origin-group">{{ field(form.origin) }}</div>
+          {{ field(form.destination) }}
+          <div class="form-text mt-n2 mb-3">Place names (e.g. "Jaipur") or coordinates ("26.91, 75.79").</div>
+          {{ field(form.start_soc_pct) }}
+          <div class="form-text mt-n2 mb-3" id="soc-hint"></div>
+
+          <details class="mb-3">
+            <summary class="small text-muted">Charging preferences</summary>
+            <div class="row mt-2">
+              <div class="col-6">{{ field(form.reserve_pct) }}</div>
+              <div class="col-6">{{ field(form.target_soc_pct) }}</div>
+              <div class="col-6">{{ field(form.charger_kw) }}</div>
+              <div class="col-6">{{ field(form.corridor_km) }}</div>
+            </div>
+          </details>
+          {{ form.submit(class_="btn btn-success w-100") }}
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-8">
+    {% if result %}
+      {% set plan = result.best %}
+      {% if plan.route.source == "estimate" %}
+        <div class="alert alert-warning"><i class="bi bi-exclamation-triangle"></i>
+          The road-routing service is unavailable, so distance and time are <strong>estimates</strong> from a straight line.</div>
+      {% endif %}
+
+      {% if not plan.feasible %}
+        <div class="alert alert-danger">
+          <strong>This trip isn't possible with the current settings.</strong> {{ plan.problem }}
+          {% if result.full_charge_suggestion %}
+            {% set s = result.full_charge_suggestion %}
+            <hr class="my-2">
+            <i class="bi bi-lightbulb"></i> It works if you <strong>charge to 100%</strong> at each stop:
+            {{ s.stops|length }} stop{{ "s" if s.stops|length != 1 }}, about {{ duration(s.total_min) }} in total.
+            Set "Charge up to" to 100 and plan again.
+          {% endif %}
+        </div>
+      {% endif %}
+
+      <div class="row g-3 mb-3">
+        {% set cards = [
+          ("signpost-split", "Distance", "%.0f km"|format(plan.total_km)),
+          ("clock", "Total time", duration(plan.total_min)),
+          ("ev-station", "Charging stops", plan.stops|length ~ (" · " ~ duration(plan.charging_min) if plan.stops else "")),
+          ("battery-half", "Arrive with", (plan.arrive_soc_pct ~ "%") if plan.arrive_soc_pct is not none else "—"),
+        ] %}
+        {% for icon, label, value in cards %}
+          <div class="col-6 col-lg-3"><div class="card shadow-sm h-100"><div class="card-body py-2">
+            <div class="text-muted small"><i class="bi bi-{{ icon }}"></i> {{ label }}</div>
+            <div class="fs-5 fw-semibold">{{ value }}</div>
+          </div></div></div>
+        {% endfor %}
+      </div>
+
+      <div class="card shadow-sm mb-3">
+        <div id="route-map" aria-label="Route map with charging stops"></div>
+        <div class="card-footer bg-white small text-muted">
+          {{ plan.origin.label|truncate(60) }} → {{ plan.destination.label|truncate(60) }}
+          · {{ plan.nearby|length }} stations within {{ form.corridor_km.data|int }} km of the route (grey)
+          · energy ≈ {{ "%.1f"|format(plan.energy_kwh) }} kWh
+        </div>
+      </div>
+
+      {% if plan.stops %}
+        <div class="card shadow-sm mb-3">
+          <div class="card-header bg-white fw-semibold">Charging stops</div>
+          <div class="table-responsive">
+            <table class="table align-middle mb-0">
+              <thead class="table-light"><tr><th>#</th><th>Station</th><th>At</th><th>Arrive</th><th>Charge to</th><th>Charging</th></tr></thead>
+              <tbody>
+                {% for s in plan.stops %}
+                  <tr>
+                    <td><span class="badge text-bg-primary">{{ s.number }}</span></td>
+                    <td><strong>{{ s.name }}</strong><div class="small text-muted">{{ s.address|truncate(90) or s.city }}</div></td>
+                    <td class="small">km {{ "%.0f"|format(s.route_km) }}<br>{{ "%.1f"|format(s.detour_km) }} km off route</td>
+                    <td>{{ "%.0f"|format(s.arrive_soc_pct) }}%</td>
+                    <td>{{ "%.0f"|format(s.depart_soc_pct) }}%</td>
+                    <td class="small">{{ "%.0f"|format(s.charge_min) }} min<br>+{{ s.charge_kwh }} kWh</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <div class="card-footer bg-white small text-muted">Charging times assume a {{ plan.ev.charger_kw|int }} kW charger at constant power; real DC charging slows above ~80%.</div>
+        </div>
+      {% endif %}
+
+      {% if result.alternatives %}
+        <div class="card shadow-sm">
+          <div class="card-header bg-white fw-semibold">Other routes considered</div>
+          <ul class="list-group list-group-flush">
+            {% for alt in result.alternatives %}
+              <li class="list-group-item small">
+                {{ "%.0f"|format(alt.route.distance_km) }} km ·
+                {% if alt.feasible %}
+                  {{ alt.stops|length }} stop{{ "s" if alt.stops|length != 1 }} · {{ duration(alt.total_min) }} in total
+                {% else %}
+                  <span class="text-danger">not possible: {{ alt.problem }}</span>
+                {% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+    {% else %}
+      <div class="card shadow-sm h-100"><div class="card-body text-muted d-flex align-items-center justify-content-center" style="min-height: 300px">
+        <div class="text-center"><i class="bi bi-map fs-1"></i><p class="mt-2 mb-0">Choose a vehicle and destination to plan a route.</p></div>
+      </div></div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(() => {
+  // Show custom-spec fields only for "Custom EV"; show the vehicle's last known battery level.
+  const vehicles = {{ vehicles|tojson }};
+  const select = document.getElementById("vehicle_id");
+  const useLocation = document.getElementById("use_vehicle_location");
+  const update = () => {
+    const v = vehicles[select.value];
+    document.getElementById("custom-specs").hidden = Boolean(v);
+    useLocation.closest(".form-check").hidden = !(v && v.has_location);
+    if (!(v && v.has_location)) useLocation.checked = false;
+    document.getElementById("origin-group").hidden = useLocation.checked;
+    document.getElementById("soc-hint").textContent =
+      v && v.soc !== null ? `Leave blank to use the vehicle's last reported level (${Math.round(v.soc)}%).` : "";
+  };
+  select.addEventListener("change", update);
+  useLocation.addEventListener("change", update);
+  update();
+
+  const data = {{ map_data|tojson }};
+  if (!data) return;
+  // Leaflet tooltips render HTML, so escape names coming from the dataset.
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const map = L.map("route-map");
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19, attribution: "&copy; OpenStreetMap contributors",
+  }).addTo(map);
+  const line = L.polyline(data.route, { color: "#2e7d32", weight: 5 }).addTo(map);
+  for (const [lat, lon, name] of data.nearby) {
+    L.circleMarker([lat, lon], { radius: 4, color: "#6c757d", weight: 1, fillOpacity: 0.6 })
+      .bindTooltip(esc(name)).addTo(map);
+  }
+  L.marker(data.origin).bindTooltip("Start").addTo(map);
+  L.marker(data.destination).bindTooltip("Destination").addTo(map);
+  for (const s of data.stops) {
+    const icon = L.divIcon({ className: "", html: `<div class="stop-icon">${s.n}</div>`, iconSize: [26, 26] });
+    L.marker([s.lat, s.lon], { icon }).bindTooltip(`Stop ${s.n}: ${esc(s.name)}`).addTo(map);
+  }
+  map.fitBounds(line.getBounds(), { padding: [25, 25] });
+})();
+</script>
+{% endblock %}

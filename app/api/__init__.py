@@ -11,4 +11,4 @@ from app.extensions import csrf
 bp = Blueprint("api", __name__, url_prefix="/api/v1")
 csrf.exempt(bp)
 
-from app.api import telemetry  # noqa: E402, F401  (registers routes on the blueprint)
+from app.api import battery, telemetry  # noqa: E402, F401  (registers routes on the blueprint)
