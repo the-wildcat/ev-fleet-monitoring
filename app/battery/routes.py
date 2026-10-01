@@ -24,12 +24,12 @@ class BatteryCheckForm(FlaskForm):
 
 # One numeric field per model feature, generated from FEATURES so the form, API and model
 # can't drift apart.
-for _name, _col, _unit, _lo, _hi in FEATURES:
+for _name, _label, _unit, _lo, _hi in FEATURES:
     setattr(
         BatteryCheckForm,
         _name,
         FloatField(
-            _col,
+            f"{_label} ({_unit})",
             validators=[InputRequired(), NumberRange(min=_lo, max=_hi)],
             render_kw={"step": "any"},
         ),

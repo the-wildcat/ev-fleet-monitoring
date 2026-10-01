@@ -37,7 +37,8 @@ def _plan_to_map(plan) -> dict:
             {"n": s.number, "lat": s.lat, "lon": s.lon, "name": s.name, "city": s.city}
             for s in plan.stops
         ],
-        "nearby": [[n["lat"], n["lon"], n["name"]] for n in plan.nearby],
+        "nearby": [[n["lat"], n["lon"], n["name"], n["kw"]] for n in plan.nearby],
+        "min_kw": plan.ev.min_charger_kw,
     }
 
 
@@ -62,6 +63,7 @@ def plan():
     return render_template(
         "routing/plan.html",
         form=form,
+        station_count=len(load_stations(current_app.config["CHARGING_STATIONS_PATH"])),
         result=result,
         map_data=_plan_to_map(result.best) if result else None,
         vehicles={
@@ -113,7 +115,8 @@ def _run_plan(form: RoutePlanForm):
         start_soc_pct=start_soc,
         reserve_pct=form.reserve_pct.data,
         target_soc_pct=form.target_soc_pct.data,
-        charger_kw=form.charger_kw.data,
+        max_charge_kw=form.max_charge_kw.data,
+        min_charger_kw=form.min_charger_kw.data,
     )
     stations = load_stations(cfg["CHARGING_STATIONS_PATH"])
     return choose_plan(origin, destination, routes, ev, stations, form.corridor_km.data)

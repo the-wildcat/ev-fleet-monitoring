@@ -26,8 +26,15 @@ class RoutePlanForm(FlaskForm):
         default=80,
         validators=[DataRequired(), NumberRange(min=30, max=100)],
     )
-    charger_kw = FloatField(
-        "Charger power (kW)", default=50, validators=[DataRequired(), NumberRange(min=3, max=350)]
+    max_charge_kw = FloatField(
+        "Car's max charging power (kW)",
+        default=50,
+        validators=[DataRequired(), NumberRange(min=3, max=350)],
+    )
+    min_charger_kw = FloatField(
+        "Only use chargers of at least (kW)",
+        default=25,
+        validators=[DataRequired(), NumberRange(min=3, max=350)],
     )
     corridor_km = FloatField(
         "Max detour from route (km)",

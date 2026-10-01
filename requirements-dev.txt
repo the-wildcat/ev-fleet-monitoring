@@ -1,7 +1,8 @@
 -r requirements.txt
 
-# Model training (reads the .xlsx dataset): python -m ml.train_battery_model
-openpyxl==3.1.5
+# Rebuilding datasets from their official sources (scripts/): PDF table extraction.
+# (scipy, used to read NASA's .mat files, is installed with scikit-learn.)
+pdfplumber==0.11.10
 
 # Testing and code quality
 pytest==9.1.1

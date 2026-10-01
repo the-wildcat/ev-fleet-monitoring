@@ -21,10 +21,12 @@ class BatteryCheck(db.Model):
     vehicle_id: Mapped[int] = mapped_column(
         ForeignKey("vehicles.id", ondelete="CASCADE"), index=True
     )
-    capacity_mah: Mapped[float]
+    # Diagnostic inputs (see app/services/battery_model.FEATURES)
     cycle_count: Mapped[float]
-    voltage_v: Mapped[float]
-    temperature_c: Mapped[float]
+    ambient_temperature_c: Mapped[float]
+    discharge_current_a: Mapped[float]
+    avg_voltage_v: Mapped[float]
+    max_temperature_c: Mapped[float]
     internal_resistance_mohm: Mapped[float]
     predicted_soh_pct: Mapped[float]
     status: Mapped[str] = mapped_column(String(20))

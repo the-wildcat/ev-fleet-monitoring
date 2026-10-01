@@ -66,7 +66,8 @@ class Config:
         "ROUTING_USER_AGENT", "EVFleetMonitor/1.0 (Infosys Springboard project)"
     )
     ROUTING_TIMEOUT_SECONDS = 10
-    CHARGING_STATIONS_PATH = BASE_DIR / "data" / "India_EV_Charging_Stations.csv"
+    # Built from India's official BEE list by scripts/build_charging_stations.py
+    CHARGING_STATIONS_PATH = BASE_DIR / "data" / "charging_stations_india.csv"
 
     # Wait up to 15 s for a lock instead of failing when two writers overlap (SQLite only).
     SQLALCHEMY_ENGINE_OPTIONS = {"connect_args": {"timeout": 15}}

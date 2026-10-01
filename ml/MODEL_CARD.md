@@ -1,63 +1,92 @@
 # Model card: battery state-of-health (SoH)
 
 ## What it does
-Predicts a battery's **state of health** (SoH, % of original capacity remaining) from one
-diagnostic reading, and derives a status from it:
+Estimates a lithium-ion cell's **state of health**: remaining capacity as a percentage of its
+rated capacity. It uses measurements a battery management system (BMS) or service diagnostic
+can take **without a full capacity test**:
 
-| Status | SoH band |
+| Input | Unit | Training range |
+|---|---|---|
+| Charge/discharge cycles | cycles | 1 – 197 |
+| Ambient temperature | °C | 4 – 44 |
+| Discharge current | A | ~1 – 4 |
+| Average voltage under load | V | ~2.8 – 3.7 |
+| Peak cell temperature | °C | ~10 – 70 |
+| Internal resistance (Re + Rct) | mΩ | ~68 – 326 |
+
+The status follows EV industry practice:
+
+| Status | SoH | Why |
+|---|---|---|
+| Good | ≥ 80% | 80% is the usual "end of first life" point for EV batteries |
+| Fair | 70 – 80% | monitor; plan replacement |
+| Needs Replacement | < 70% | below the 70% typically guaranteed by EV battery warranties |
+
+Used by the **Battery Health** page, `POST /api/v1/predict/battery` and the battery-wear alerts.
+
+## Data
+**NASA Ames Prognostics Center of Excellence, Li-ion Battery Aging Data Set**
+(B. Saha and K. Goebel, 2007, NASA Prognostics Data Repository). 34 commercial 18650 cells,
+rated 2.0 Ah, repeatedly charged and discharged at 4 °C, 24 °C and 43 °C until they wore out, with
+periodic electrochemical impedance (EIS) measurements.
+
+`python -m scripts.build_battery_dataset` downloads the original archive and builds
+`data/battery_cycles_nasa.csv`, one row per discharge cycle:
+- inputs from the discharge measurements; internal resistance = Re + Rct from the most recent
+  impedance test before that cycle;
+- target `soh_pct` = measured capacity / 2.0 Ah × 100.
+
+Cleaning, with counts printed by the script:
+
+| Step | Rows removed |
 |---|---|
-| Good | ≥ 75% |
-| Fair | 50% – 75% |
-| Needs Replacement | < 50% |
+| Duplicate copies of B0025–B0028 (shipped in two archives) | 112 |
+| Cycles before the first impedance test (no resistance value) | 76 |
+| Capacity outside 20–105% of rating (measurement glitches) | 215 |
+| Single-cycle spikes > 10 points from the battery's rolling median | 16 |
+| Batteries with < 20 usable cycles | 2 batteries |
 
-Inputs: capacity (mAh), cycle count, voltage (V), temperature (°C), internal resistance (mΩ).
-Used by the **Battery Health** page, the `POST /api/v1/predict/battery` endpoint and the
-battery-wear alerts.
+Result: **2,449 discharge cycles from 32 batteries**, covering all three health bands.
 
-## Training
-- **Data:** `data/Battery_Health_Dataset.xlsx`, 100 rows, no missing values. The readings are
-  cell-level (2,000–4,000 mAh, 3.2–4.2 V), so inputs should come from a cell or module
-  diagnostic test, not from whole-pack telemetry.
-- **Method:** `python -m ml.train_battery_model` compares a mean baseline, linear regression,
-  random forest and gradient boosting with repeated 5-fold cross-validation (5 × 3 = 15 fits
-  each), keeps the lowest mean absolute error (MAE), then refits on all rows.
-- **Outputs:** `models/battery_soh.joblib` and `models/battery_soh.json` (metrics, feature list,
-  scikit-learn version, dataset SHA-256 and training time, for reproducibility).
+## Evaluation
+**Grouped cross-validation (8 folds by battery):** every prediction is made by a model that
+never saw that battery. Splitting random cycles instead would leak information (neighbouring
+cycles of the same cell are nearly identical) and inflate the score.
 
-## Results (cross-validated)
+| Model | MAE (SoH points) | RMSE | R² | Correct status | Worst battery MAE |
+|---|---|---|---|---|---|
+| Mean baseline | 12.52 | 15.34 | −0.04 | 20% | 36.2 |
+| Linear regression | 7.28 | 8.85 | 0.66 | 67% | 16.1 |
+| **Random forest (selected)** | **5.35** | **6.88** | **0.79** | **74%** | 15.4 |
+| Gradient boosting | 6.06 | 7.74 | 0.74 | 70% | 16.5 |
 
-| Model | MAE (SoH %) | RMSE | R² |
-|---|---|---|---|
-| Mean baseline | 14.11 | 16.23 | −0.07 |
-| **Linear regression (selected)** | **0.00** | **0.00** | **1.000** |
-| Random forest | 2.47 | 3.13 | 0.958 |
-| Gradient boosting | 1.65 | 2.05 | 0.982 |
+Feature importance (permutation, drop in R² when shuffled): average voltage under load (1.42),
+ambient temperature (0.71), peak temperature (0.26), cycle count (0.25), discharge current
+(0.19), internal resistance (0.06).
 
-Status derived from predicted SoH matches the labelled status 100% of the time.
+## Limitations
+- **Cell-level, laboratory data.** EV packs contain many cells; apply the model to cell or
+  module diagnostics, not to whole-pack telemetry. Lab cycling is harsher and more uniform than
+  real driving.
+- **Temperature effects mix with ageing.** At 4 °C cells deliver less capacity even when not
+  worn; the model learns this (ambient temperature is an input), so compare checks taken at
+  similar temperatures.
+- **Different test protocols.** NASA ran groups of cells at different currents and cut-off
+  voltages, which also changes measured capacity; that partly explains the worst-battery error.
+- **Small number of batteries (32).** Expect around ±5 SoH points on a typical unseen cell and
+  up to ±15 on unusual ones. Use the status bands as guidance, not a guarantee.
+- **Out-of-range inputs** (e.g. 1,000 cycles) are extrapolation; the model is only reliable
+  within the training ranges listed above.
 
-## Important limitation: the dataset is synthetic
-A perfect score is a warning sign, so the fitted model was inspected. The labels follow an
-exact formula:
-
-> **SoH ≈ capacity_mAh / 40 − cycle_count / 75**
-
-Voltage, temperature and internal resistance have no effect (coefficients ≈ 0). Linear
-regression therefore recovers the generating formula, which is why it scores perfectly. Notes:
-
-- The original project used a random forest; on this data it is less accurate than the linear
-  model, which the comparison above makes visible.
-- The model is only as realistic as the dataset. **Real batteries** degrade non-linearly and
-  depend on temperature and resistance; with real data, expect a non-zero error and possibly a
-  different winning model. The training pipeline needs no code changes for that: replace the
-  dataset and re-run the script.
-- 100 rows is very small; cross-validation is used instead of a single train/test split for that
-  reason.
-- Inputs outside the training ranges (above) are extrapolations; the API enforces broad
-  physical limits but cannot guarantee accuracy outside the observed range.
+## History
+The original project used a 100-row synthetic spreadsheet (now in `legacy/datasets/`). Its
+health column was an exact formula, `capacity / 40 − cycles / 75`, and it used current
+capacity as an input, which is the quantity SoH is computed from, so any model scored perfectly.
+Replacing it with real data gives honest, realistic accuracy.
 
 ## Retraining
 ```bash
+python -m scripts.build_battery_dataset   # downloads ~210 MB on first run
 python -m ml.train_battery_model
 ```
-Commit the updated `models/battery_soh.*` files. The app loads the model at the first
-prediction; restart the app to pick up a new model.
+Commit the updated `data/battery_cycles_nasa.csv` and `models/battery_soh.*`, then restart the app.

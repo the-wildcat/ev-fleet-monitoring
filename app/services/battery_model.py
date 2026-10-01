@@ -1,8 +1,12 @@
 """Battery state-of-health (SoH) model: shared by the training script and the app.
 
-The model predicts SoH (%) from a battery diagnostic reading. The dataset's Status labels
-follow fixed SoH bands (Good >= 75, Fair 50-75, Needs Replacement < 50), so the status is
-derived from the predicted SoH rather than predicted by a second model.
+The model predicts SoH (% of rated capacity remaining) from measurements a battery management
+system or service diagnostic can take without a full capacity test: cycle count, temperatures,
+discharge current, average voltage under load and internal resistance. It is trained on the
+NASA Li-ion Battery Aging dataset (real cells; see ml/MODEL_CARD.md).
+
+Status bands follow EV industry practice: 80% is the usual "end of first life" mark and
+manufacturer battery warranties typically guarantee 70%.
 """
 
 from __future__ import annotations
@@ -15,18 +19,21 @@ from pathlib import Path
 import joblib
 import pandas as pd
 
-# (API/form field name, dataset column name, unit, min, max)
+# (field name = dataset column, label, unit, min, max). Limits are broad physical bounds for
+# a Li-ion cell; the training ranges are narrower (see the model card).
 FEATURES: list[tuple[str, str, str, float, float]] = [
-    ("capacity_mah", "Battery Capacity (mAh)", "mAh", 500, 10_000),
-    ("cycle_count", "Cycle Count", "cycles", 0, 10_000),
-    ("voltage_v", "Voltage (V)", "V", 2.0, 5.0),
-    ("temperature_c", "Temperature (°C)", "°C", -30, 80),
-    ("internal_resistance_mohm", "Internal Resistance (mΩ)", "mΩ", 1, 1_000),
+    ("cycle_count", "Charge/discharge cycles", "cycles", 0, 5_000),
+    ("ambient_temperature_c", "Ambient temperature", "°C", -20, 60),
+    ("discharge_current_a", "Discharge current", "A", 0.1, 20),
+    ("avg_voltage_v", "Average voltage under load", "V", 2.0, 4.5),
+    ("max_temperature_c", "Peak cell temperature", "°C", -20, 90),
+    ("internal_resistance_mohm", "Internal resistance", "mΩ", 1, 2_000),
 ]
-TARGET = "Battery Health (%)"
+FEATURE_NAMES = [name for name, *_ in FEATURES]
+TARGET = "soh_pct"
 
-GOOD_SOH = 75.0
-REPLACE_SOH = 50.0
+GOOD_SOH = 80.0
+REPLACE_SOH = 70.0
 
 
 def status_for(soh_pct: float) -> str:
@@ -42,7 +49,7 @@ def validate_features(raw: object) -> tuple[dict[str, float], dict[str, str]]:
     if not isinstance(raw, dict):
         return {}, {"_": "Each input must be a JSON object."}
     clean, errors = {}, {}
-    for name, _col, _unit, lo, hi in FEATURES:
+    for name, _label, _unit, lo, hi in FEATURES:
         value = raw.get(name)
         if value is None:
             errors[name] = "This field is required."
@@ -89,7 +96,7 @@ class BatteryModel:
 
     def predict(self, inputs: list[dict[str, float]]) -> list[Prediction]:
         model = self._load()
-        frame = pd.DataFrame([{col: item[name] for name, col, *_ in FEATURES} for item in inputs])
+        frame = pd.DataFrame([{name: item[name] for name in FEATURE_NAMES} for item in inputs])
         preds = model.predict(frame)
         results = []
         for value in preds:

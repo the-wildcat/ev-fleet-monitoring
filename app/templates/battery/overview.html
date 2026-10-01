@@ -58,7 +58,7 @@
     <div class="card shadow-sm">
       <div class="card-header bg-white fw-semibold">Battery health check (ML)</div>
       <div class="card-body">
-        <p class="small text-muted">Enter readings from a battery diagnostic test to predict its state of health.</p>
+        <p class="small text-muted">Enter cell readings from the battery management system or a service diagnostic. The model estimates remaining capacity without a full capacity test.</p>
         {% if prediction %}
           <div class="alert alert-info">
             Predicted health: <strong>{{ "%.1f"|format(prediction.soh_pct) }}%</strong> {{ soh_badge(prediction.soh_pct, prediction.status) }}
@@ -66,15 +66,17 @@
         {% endif %}
         <form method="post" novalidate>
           {{ form.hidden_tag() }}
-          {% for name, column, unit, lo, hi in features %}{{ field(form[name]) }}{% endfor %}
+          {% for name, label, unit, lo, hi in features %}{{ field(form[name]) }}{% endfor %}
           {% if current_user.is_manager %}{{ field(form.vehicle_id) }}{% endif %}
           {{ form.submit(class_="btn btn-success w-100") }}
         </form>
         {% if model_meta %}
           {% set m = model_meta.metrics[model_meta.model] %}
           <p class="small text-muted mt-3 mb-0">
-            Model: {{ model_meta.model|replace("_", " ") }} · cross-validated error ±{{ "%.2f"|format(m.mae) }}% ·
-            trained on {{ model_meta.training_rows }} batteries. Health bands: Good ≥ 75%, Fair 50–75%, Replace &lt; 50%.
+            Model: {{ model_meta.model|replace("_", " ") }} trained on {{ model_meta.training_rows }} real discharge cycles
+            from {{ model_meta.training_batteries }} cells (NASA battery ageing data). Typical error on unseen batteries:
+            ±{{ "%.1f"|format(m.mae) }} percentage points. Health bands: Good ≥ 80%, Fair 70–80%, Replace &lt; 70%
+            (EV warranty practice).
           </p>
         {% else %}
           <p class="small text-danger mt-3 mb-0">Model not trained yet: run <code>python -m ml.train_battery_model</code>.</p>

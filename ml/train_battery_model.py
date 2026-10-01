@@ -1,10 +1,14 @@
-"""Train the battery state-of-health (SoH) model.
+"""Train the battery state-of-health (SoH) model on real cell-ageing data.
 
 Usage (from the project root):
+    python -m scripts.build_battery_dataset   # once: download + clean the NASA data
     python -m ml.train_battery_model
 
-Compares a baseline and three regressors with repeated 5-fold cross-validation, keeps the
-model with the lowest mean absolute error, refits it on all rows and writes:
+Evaluation uses grouped cross-validation: each fold holds out whole batteries, so the score
+measures how well the model predicts batteries it has never seen. (Splitting random cycles
+would let the model see other cycles of the same battery and inflate the score.)
+
+Writes:
     models/battery_soh.joblib   the fitted scikit-learn pipeline
     models/battery_soh.json     metadata: features, metrics, versions, dataset hash
 """
@@ -14,7 +18,6 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
-import unicodedata
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -22,109 +25,120 @@ import joblib
 import numpy as np
 import pandas as pd
 import sklearn
-from sklearn.base import clone
 from sklearn.dummy import DummyRegressor
-from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
+from sklearn.ensemble import HistGradientBoostingRegressor, RandomForestRegressor
+from sklearn.inspection import permutation_importance
 from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import RepeatedKFold, cross_validate
+from sklearn.model_selection import GroupKFold, cross_val_predict
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from app.services.battery_model import FEATURES, TARGET, status_for  # noqa: E402
+from app.services.battery_model import (  # noqa: E402
+    FEATURE_NAMES,
+    FEATURES,
+    GOOD_SOH,
+    REPLACE_SOH,
+    TARGET,
+    status_for,
+)
 
-DATA_PATH = ROOT / "data" / "Battery_Health_Dataset.xlsx"
+DATA_PATH = ROOT / "data" / "battery_cycles_nasa.csv"
 MODEL_PATH = ROOT / "models" / "battery_soh.joblib"
 RANDOM_STATE = 42
+N_SPLITS = 8
 
 CANDIDATES = {
     "baseline_mean": DummyRegressor(strategy="mean"),
     "linear_regression": make_pipeline(StandardScaler(), LinearRegression()),
     "random_forest": RandomForestRegressor(
-        n_estimators=300, min_samples_leaf=2, random_state=RANDOM_STATE
+        n_estimators=400, min_samples_leaf=3, n_jobs=-1, random_state=RANDOM_STATE
     ),
-    "gradient_boosting": GradientBoostingRegressor(random_state=RANDOM_STATE),
+    "gradient_boosting": HistGradientBoostingRegressor(
+        max_iter=400, learning_rate=0.05, min_samples_leaf=20, random_state=RANDOM_STATE
+    ),
 }
 
 
 def load_data() -> tuple[pd.DataFrame, pd.Series, pd.Series]:
-    df = pd.read_excel(DATA_PATH)
-    # NFKC folds look-alike characters, e.g. the Ohm sign (U+2126) used in the dataset's
-    # "mΩ" header into the Greek capital omega (U+03A9) used in FEATURES.
-    df.columns = [unicodedata.normalize("NFKC", str(c)).strip() for c in df.columns]
-    columns = [col for _, col, *_ in FEATURES]
-    missing = set(columns + [TARGET, "Status"]) - set(df.columns)
-    if missing:
-        raise SystemExit(f"Dataset is missing columns: {sorted(missing)}")
-    df = df.dropna(subset=columns + [TARGET])
-    return df[columns], df[TARGET], df["Status"]
+    if not DATA_PATH.exists():
+        raise SystemExit(
+            f"{DATA_PATH.name} not found. Run: python -m scripts.build_battery_dataset"
+        )
+    df = pd.read_csv(DATA_PATH)
+    df = df.dropna(subset=FEATURE_NAMES + [TARGET])
+    return df[FEATURE_NAMES], df[TARGET], df["battery_id"]
 
 
-def status_accuracy(model, X, y_soh, y_status, cv) -> float:
-    """How often the status derived from predicted SoH matches the labelled status."""
-    hits = total = 0
-    for train_idx, test_idx in cv.split(X):
-        fitted = clone(model).fit(X.iloc[train_idx], y_soh.iloc[train_idx])
-        predicted = [status_for(v) for v in fitted.predict(X.iloc[test_idx])]
-        hits += sum(p == t for p, t in zip(predicted, y_status.iloc[test_idx], strict=True))
-        total += len(test_idx)
-    return hits / total
+def evaluate(model, X, y, groups, cv) -> dict:
+    """Out-of-fold predictions for every row, each made by a model that never saw its battery."""
+    pred = cross_val_predict(model, X, y, groups=groups, cv=cv)
+    err = pred - y
+    per_battery_mae = pd.Series(np.abs(err)).groupby(groups.to_numpy()).mean()
+    true_status = y.map(status_for)
+    pred_status = pd.Series(pred, index=y.index).map(status_for)
+    return {
+        "mae": round(float(np.abs(err).mean()), 3),
+        "rmse": round(float(np.sqrt((err**2).mean())), 3),
+        "r2": round(float(1 - (err**2).sum() / ((y - y.mean()) ** 2).sum()), 3),
+        "status_accuracy": round(float((true_status == pred_status).mean()), 3),
+        "worst_battery_mae": round(float(per_battery_mae.max()), 3),
+    }
 
 
 def main() -> None:
-    X, y_soh, y_status = load_data()
-    print(f"Loaded {len(X)} rows from {DATA_PATH.name}")
+    X, y, groups = load_data()
+    print(f"Loaded {len(X)} discharge cycles from {groups.nunique()} batteries ({DATA_PATH.name})")
 
-    # The labels follow the documented SoH bands exactly; check so a dataset change is noticed.
-    label_agreement = float(
-        np.mean([status_for(v) == s for v, s in zip(y_soh, y_status, strict=True)])
-    )
-    print(f"Status labels consistent with SoH bands: {label_agreement:.0%}")
-
-    cv = RepeatedKFold(n_splits=5, n_repeats=3, random_state=RANDOM_STATE)
-    scoring = {
-        "mae": "neg_mean_absolute_error",
-        "rmse": "neg_root_mean_squared_error",
-        "r2": "r2",
-    }
+    cv = GroupKFold(n_splits=N_SPLITS)
     results = {}
-    print(f"\n{'model':<20}{'MAE':>8}{'RMSE':>8}{'R2':>8}")
+    print(f"\n{'model':<20}{'MAE':>7}{'RMSE':>7}{'R2':>7}{'status':>8}{'worst':>7}")
     for name, model in CANDIDATES.items():
-        scores = cross_validate(model, X, y_soh, cv=cv, scoring=scoring)
-        results[name] = {
-            "mae": round(float(-scores["test_mae"].mean()), 3),
-            "mae_std": round(float(scores["test_mae"].std()), 3),
-            "rmse": round(float(-scores["test_rmse"].mean()), 3),
-            "r2": round(float(scores["test_r2"].mean()), 3),
-        }
-        r = results[name]
-        print(f"{name:<20}{r['mae']:>8.2f}{r['rmse']:>8.2f}{r['r2']:>8.3f}")
+        r = results[name] = evaluate(model, X, y, groups, cv)
+        print(
+            f"{name:<20}{r['mae']:>7.2f}{r['rmse']:>7.2f}{r['r2']:>7.3f}"
+            f"{r['status_accuracy']:>8.0%}{r['worst_battery_mae']:>7.1f}"
+        )
 
     best_name = min((n for n in results if n != "baseline_mean"), key=lambda n: results[n]["mae"])
-    best = CANDIDATES[best_name]
-    results[best_name]["status_accuracy"] = round(
-        status_accuracy(
-            best, X, y_soh, y_status, RepeatedKFold(n_splits=5, n_repeats=1, random_state=1)
-        ),
-        3,
-    )
-    print(f"\nSelected: {best_name} (status accuracy {results[best_name]['status_accuracy']:.0%})")
+    best = CANDIDATES[best_name].fit(X, y)
+    print(f"\nSelected: {best_name}")
 
-    best.fit(X, y_soh)
+    importance = permutation_importance(best, X, y, n_repeats=5, random_state=RANDOM_STATE)
+    ranked = sorted(
+        zip(FEATURE_NAMES, importance.importances_mean, strict=True), key=lambda p: -p[1]
+    )
+    print("Permutation importance (drop in R² when a feature is shuffled):")
+    for feature, value in ranked:
+        print(f"  {feature:<26}{value:.3f}")
+
     MODEL_PATH.parent.mkdir(exist_ok=True)
     joblib.dump(best, MODEL_PATH)
-
+    training_ranges = {
+        name: [round(float(X[name].min()), 2), round(float(X[name].max()), 2)]
+        for name in FEATURE_NAMES
+    }
     metadata = {
         "model": best_name,
-        "target": TARGET,
-        "features": [{"name": n, "column": c, "unit": u} for n, c, u, *_ in FEATURES],
-        "status_bands": {"Good": ">= 75", "Fair": "50 - 75", "Needs Replacement": "< 50"},
-        "cv": "RepeatedKFold(n_splits=5, n_repeats=3)",
+        "target": "SoH % (measured capacity / 2.0 Ah rated capacity)",
+        "features": [
+            {"name": n, "label": label, "unit": unit, "training_range": training_ranges[n]}
+            for n, label, unit, *_ in FEATURES
+        ],
+        "status_bands": {
+            "Good": f">= {GOOD_SOH:g}",
+            "Fair": f"{REPLACE_SOH:g} - {GOOD_SOH:g}",
+            "Needs Replacement": f"< {REPLACE_SOH:g}",
+        },
+        "cv": f"GroupKFold(n_splits={N_SPLITS}) by battery (unseen-battery evaluation)",
         "metrics": results,
+        "feature_importance": {f: round(float(v), 4) for f, v in ranked},
         "training_rows": len(X),
+        "training_batteries": int(groups.nunique()),
         "dataset": DATA_PATH.name,
+        "dataset_source": "NASA Ames PCoE Li-ion Battery Aging Data Set (Saha & Goebel, 2007)",
         "dataset_sha256": hashlib.sha256(DATA_PATH.read_bytes()).hexdigest(),
         "sklearn_version": sklearn.__version__,
         "trained_at": datetime.now(UTC).isoformat(timespec="seconds"),

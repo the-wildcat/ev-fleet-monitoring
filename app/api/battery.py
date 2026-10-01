@@ -1,12 +1,12 @@
 """POST /api/v1/predict/battery: battery state-of-health predictions (ML model).
 
 Request (single input, or {"inputs": [...]} with up to 100):
-    {"capacity_mah": 3200, "cycle_count": 450, "voltage_v": 3.8,
-     "temperature_c": 28.5, "internal_resistance_mohm": 120}
+    {"cycle_count": 100, "ambient_temperature_c": 24, "discharge_current_a": 2.0,
+     "avg_voltage_v": 3.52, "max_temperature_c": 41.0, "internal_resistance_mohm": 131.6}
 
 Response 200:
-    {"predictions": [{"soh_pct": 68.0, "status": "Fair"}],
-     "model": {"name": "linear_regression", "trained_at": "...", "mae": 0.0}}
+    {"predictions": [{"soh_pct": 78.6, "status": "Fair"}],
+     "model": {"name": "random_forest", "trained_at": "...", "cv_mae": 5.35}}
 
 The endpoint is stateless and stores nothing, so it doesn't require authentication; inputs
 are validated and batches capped. 400 = invalid input, 503 = model not trained yet.

@@ -3,7 +3,8 @@
 1. Geocode the origin/destination with OpenStreetMap Nominatim (or accept "lat, lon").
 2. Get the road route from OSRM (distance, duration, geometry). If OSRM is unreachable,
    fall back to a straight-line estimate and say so.
-3. Find charging stations within a corridor around the route (vectorised haversine).
+3. Find car-compatible charging stations within a corridor around the route (vectorised
+   haversine), using India's official BEE station list with real charger power ratings.
 4. Plan stops greedily: drive as far as the battery safely allows (keeping a reserve), charge
    at the farthest reachable station, repeat. "Farthest reachable" minimises the number of
    stops when charging to the same level each time.
@@ -24,13 +25,8 @@ import requests
 log = logging.getLogger(__name__)
 EARTH_RADIUS_KM = 6371.0
 INDIA_BBOX = {"lat": (6.0, 37.5), "lon": (68.0, 98.0)}
-# Spelling variants found in the station dataset -> one display name.
-_CITY_ALIASES = {
-    "Bangalore": "Bengaluru",
-    "Banglore": "Bengaluru",
-    "Bengaluru Urban": "Bengaluru",
-    "Gurgaon": "Gurugram",
-}
+# Power assumed for car chargers whose rating is missing in the source data (slow AC).
+UNKNOWN_POWER_KW = 7.4
 _LATLON = re.compile(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$")
 
 
@@ -44,55 +40,39 @@ class RoutingError(Exception):
 @dataclass(frozen=True)
 class Stations:
     names: np.ndarray
+    operators: np.ndarray
     addresses: np.ndarray
     cities: np.ndarray
     lat: np.ndarray
     lon: np.ndarray
-    cleaning_report: dict
+    power_kw: np.ndarray  # fastest charger at the site that a car can use
+    connector_types: np.ndarray
 
     def __len__(self) -> int:
         return len(self.lat)
 
 
-def _in_india(lat: pd.Series, lon: pd.Series) -> pd.Series:
-    return lat.between(*INDIA_BBOX["lat"]) & lon.between(*INDIA_BBOX["lon"])
-
-
 @lru_cache(maxsize=4)
 def load_stations(path: Path) -> Stations:
-    """Load and clean the charging-station dataset (cached per file).
+    """Car-compatible stations from data/charging_stations_india.csv (cached per file).
 
-    The raw file has duplicate rows, some swapped latitude/longitude pairs and a few corrupted
-    coordinates; swaps are repaired, anything else outside India is dropped.
+    The CSV is built and cleaned from India's official BEE charging-station list by
+    scripts/build_charging_stations.py. Stations that only have 2/3-wheeler (LEV) chargers
+    are excluded here because cars can't use them.
     """
     df = pd.read_csv(path)
-    report = {"raw_rows": len(df)}
-
-    swapped = ~_in_india(df.latitude, df.longitude) & _in_india(df.longitude, df.latitude)
-    df.loc[swapped, ["latitude", "longitude"]] = df.loc[swapped, ["longitude", "latitude"]].values
-    report["swapped_fixed"] = int(swapped.sum())
-
-    valid = _in_india(df.latitude, df.longitude)
-    report["invalid_dropped"] = int((~valid).sum())
-    df = df[valid]
-
-    before = len(df)
-    df = df.drop_duplicates(subset=["name", "latitude", "longitude"])
-    report["duplicates_dropped"] = before - len(df)
-
-    df = df.assign(
-        address=df.address.fillna(""),
-        city=df.city.astype(str).str.strip().str.title().replace(_CITY_ALIASES),
-    )
-    report["clean_rows"] = len(df)
-    log.info("Charging stations loaded: %s", report)
+    in_india = df.lat.between(*INDIA_BBOX["lat"]) & df.lon.between(*INDIA_BBOX["lon"])
+    df = df[df.car_compatible.astype(bool) & in_india]
+    log.info("Loaded %d car-compatible charging stations from %s", len(df), Path(path).name)
     return Stations(
         names=df.name.to_numpy(),
-        addresses=df.address.to_numpy(),
-        cities=df.city.to_numpy(),
-        lat=df.latitude.to_numpy(dtype=float),
-        lon=df.longitude.to_numpy(dtype=float),
-        cleaning_report=report,
+        operators=df.operator.to_numpy(),
+        addresses=df.address.fillna("").to_numpy(),
+        cities=df.city.fillna("").to_numpy(),
+        lat=df.lat.to_numpy(dtype=float),
+        lon=df.lon.to_numpy(dtype=float),
+        power_kw=df.max_car_kw.fillna(UNKNOWN_POWER_KW).to_numpy(dtype=float),
+        connector_types=df.connector_types.fillna("").to_numpy(),
     )
 
 
@@ -227,7 +207,11 @@ class EVParams:
     start_soc_pct: float
     reserve_pct: float = 15.0  # never plan to arrive below this
     target_soc_pct: float = 80.0  # charge up to this at each stop (DC charging slows above ~80%)
-    charger_kw: float = 50.0  # assumed charger power (the dataset has no power ratings)
+    max_charge_kw: float = 50.0  # the car's own charging limit; actual = min(car, charger)
+    min_charger_kw: float = 25.0  # skip slower chargers when choosing stops (25 kW ~ DC fast)
+
+    def charge_kw(self, station_kw: float) -> float:
+        return min(self.max_charge_kw, station_kw)
 
     def km_for(self, soc_pct: float) -> float:
         return self.capacity_kwh * soc_pct / 100 * self.efficiency_km_per_kwh
@@ -240,8 +224,12 @@ class EVParams:
 class Stop:
     number: int
     name: str
+    operator: str
     address: str
     city: str
+    station_kw: float  # fastest car charger at the station
+    charge_kw: float  # power actually used (limited by the car)
+    connector_types: str
     lat: float
     lon: float
     route_km: float  # position along the route
@@ -321,7 +309,7 @@ def plan_trip(
     nearest = dist.argmin(axis=1)
     off_route = dist[np.arange(len(stations)), nearest]
     in_corridor = np.where(off_route <= corridor_km)[0]
-    candidates = sorted(
+    corridor = sorted(
         ((float(cum[nearest[i]]), float(off_route[i]), int(i)) for i in in_corridor),
         key=lambda c: c[0],
     )
@@ -330,9 +318,12 @@ def plan_trip(
             "name": str(stations.names[i]),
             "lat": float(stations.lat[i]),
             "lon": float(stations.lon[i]),
+            "kw": float(stations.power_kw[i]),
         }
-        for _, _, i in candidates[:400]
+        for _, _, i in corridor[:500]
     ]
+    # Only chargers at least this fast are considered for stops.
+    candidates = [c for c in corridor if stations.power_kw[c[2]] >= ev.min_charger_kw]
 
     position, soc = 0.0, ev.start_soc_pct
     while True:
@@ -354,21 +345,28 @@ def plan_trip(
                 )
             else:
                 plan.problem = (
-                    f"No charging station within reach after {position:.0f} km "
-                    f"(range ≈ {max(reach_km, 0):.0f} km keeping a {ev.reserve_pct:.0f}% "
-                    "reserve). Try a higher charge target or a wider search corridor."
+                    f"No charger of {ev.min_charger_kw:g} kW or more within reach after "
+                    f"{position:.0f} km (range ≈ {max(reach_km, 0):.0f} km keeping a "
+                    f"{ev.reserve_pct:.0f}% reserve). Try a higher charge target, a wider search "
+                    "corridor or a lower minimum charger power."
                 )
             return plan
 
         stop_km, detour, idx = max(reachable, key=lambda c: c[0])
         arrive = soc - ev.soc_used(stop_km - position + detour)
         added_kwh = ev.capacity_kwh * (ev.target_soc_pct - arrive) / 100
+        station_kw = float(stations.power_kw[idx])
+        charge_kw = ev.charge_kw(station_kw)
         plan.stops.append(
             Stop(
                 number=len(plan.stops) + 1,
                 name=str(stations.names[idx]),
+                operator=str(stations.operators[idx]),
                 address=str(stations.addresses[idx]),
                 city=str(stations.cities[idx]),
+                station_kw=station_kw,
+                charge_kw=charge_kw,
+                connector_types=str(stations.connector_types[idx]),
                 lat=float(stations.lat[idx]),
                 lon=float(stations.lon[idx]),
                 route_km=round(stop_km, 1),
@@ -376,7 +374,7 @@ def plan_trip(
                 arrive_soc_pct=round(arrive, 1),
                 depart_soc_pct=ev.target_soc_pct,
                 charge_kwh=round(added_kwh, 1),
-                charge_min=round(added_kwh / ev.charger_kw * 60, 0),
+                charge_min=round(added_kwh / charge_kw * 60, 0),
             )
         )
         # Back on the route at the station's position, minus the energy to return from it.

@@ -89,22 +89,27 @@ or the vehicle's current location:
    from **OSRM**. Both are free and need no API key; set `NOMINATIM_URL` / `OSRM_URL` to use your
    own instances. If OSRM is unreachable the planner falls back to a clearly labelled
    straight-line estimate.
-2. Charging stations within a chosen distance of each route are found from
-   `data/India_EV_Charging_Stations.csv`. The raw file is cleaned on load: swapped
-   coordinates fixed, invalid ones and 324 duplicates dropped, leaving 1,214 stations.
+2. Car charging stations within a chosen distance of each route come from India's official
+   public charging-station list (see [Data sources](#data-sources)), including each station's
+   real charger power. 2/3-wheeler-only (LEV) chargers are excluded.
 3. Stops are chosen greedily: drive as far as the battery allows while keeping a reserve, charge
-   at the farthest reachable station, repeat. This minimises the number of stops.
+   at the farthest reachable charger of at least the chosen power (25 kW DC by default), repeat.
+   This minimises the number of stops. Charging time uses the lower of the station's power and
+   the car's own limit.
 4. Every alternative route is planned and the quickest feasible one (driving + charging) is
    recommended. If none works, the planner explains why and checks whether charging to 100% would.
 
 ## Battery health and alerts
 
-- **ML health check** (`/battery`): predicts state of health (SoH) from a diagnostic reading;
-  managers can save results to a vehicle's battery history. Train with
-  `python -m ml.train_battery_model`; see [`ml/MODEL_CARD.md`](ml/MODEL_CARD.md) for the
-  method, results and limitations (the provided dataset is synthetic).
-- **Prediction API:** `POST /api/v1/predict/battery` with `capacity_mah`, `cycle_count`,
-  `voltage_v`, `temperature_c`, `internal_resistance_mohm` (or `{"inputs": [...]}`, up to 100).
+- **ML health check** (`/battery`): estimates state of health (SoH, % of rated capacity) from
+  measurements a BMS or service diagnostic can take without a full capacity test. It is a
+  random forest trained on **real cell-ageing data from NASA**; on batteries it never saw, the
+  typical error is about ±5 SoH points (R² 0.79). Managers can save results to a vehicle's
+  battery history. See [`ml/MODEL_CARD.md`](ml/MODEL_CARD.md) for the method, evaluation and
+  limitations.
+- **Prediction API:** `POST /api/v1/predict/battery` with `cycle_count`,
+  `ambient_temperature_c`, `discharge_current_a`, `avg_voltage_v`, `max_temperature_c`,
+  `internal_resistance_mohm` (or `{"inputs": [...]}`, up to 100).
 - **Alerts**, raised automatically and resolved when the condition clears (one open alert per
   vehicle and type):
 
@@ -112,7 +117,24 @@ or the vehicle's current location:
 |---|---|---|---|
 | Low battery | charge < 20% while not charging | < 10% | charging, or ≥ 25% |
 | Battery overheating | ≥ 45 °C | ≥ 55 °C | ≤ 42 °C |
-| Battery wear (from a saved check) | SoH < 75% | SoH < 50% | a later check ≥ 75% |
+| Battery wear (from a saved check) | SoH < 80% | SoH < 70% | a later check ≥ 80% |
+
+The wear thresholds follow EV practice: 80% is the usual end-of-first-life mark, and battery
+warranties typically guarantee 70%.
+
+## Data sources
+
+Both datasets are real and rebuilt from their official sources by scripts in `scripts/`.
+Downloads go to `data/raw/`, which git ignores; the cleaned outputs in `data/` are committed.
+
+| Dataset | Source | Used for | Rebuild |
+|---|---|---|---|
+| `data/charging_stations_india.csv` | **Bureau of Energy Efficiency (Ministry of Power, Govt. of India)**, *EV Public Charging Stations Data till 26 October 2025*, [beeindia.gov.in](https://www.beeindia.gov.in/WriteReadData/RTF1984/EV_PCS_Data_29277.pdf) | Route planner | `python -m scripts.build_charging_stations` |
+| `data/battery_cycles_nasa.csv` | **NASA Ames Prognostics Center of Excellence**, *Li-ion Battery Aging Data Set*, B. Saha & K. Goebel (2007), [NASA PCoE data repository](https://www.nasa.gov/intelligent-systems-division/discovery-and-systems-health/pcoe/pcoe-data-set-repository/) | Battery health model | `python -m scripts.build_battery_dataset`, then `python -m ml.train_battery_model` |
+
+Each script prints a cleaning report: duplicates, invalid coordinates or measurements, and
+normalised connector types. The original submission's datasets (a synthetic battery sheet and an
+unofficial station list) are kept in `legacy/datasets/` for reference.
 
 ## Project layout
 
@@ -132,6 +154,7 @@ app/            Flask application (app factory, blueprints, templates, static fi
   main/         overview dashboard and /healthz endpoint
   cli.py        create-admin, set-role, send-test-email, seed-vehicles, simulate, prune-telemetry
 migrations/     database schema versions (Alembic via Flask-Migrate)
+scripts/        rebuild datasets from their official sources
 ml/             model training script and model card
 models/         trained model + metadata (committed, so the app works without retraining)
 data/           datasets used by the app

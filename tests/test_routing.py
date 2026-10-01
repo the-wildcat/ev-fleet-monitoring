@@ -33,58 +33,76 @@ def straight_route(origin=A, dest=B, n=300) -> Route:
     return Route(km, km / 60 * 60, coords, "osrm")  # 60 km/h
 
 
-def stations_at(*lats, lon_offset=0.0) -> Stations:
+def stations_at(*lats, lon_offset=0.0, kw=60.0) -> Stations:
     n = len(lats)
+    power = kw if isinstance(kw, list | tuple) else [kw] * n
     return Stations(
         names=np.array([f"Station {i + 1}" for i in range(n)]),
+        operators=np.array(["Op"] * n),
         addresses=np.array([""] * n),
         cities=np.array(["Town"] * n),
         lat=np.array(lats, dtype=float),
         lon=np.full(n, 78.0 + lon_offset),
-        cleaning_report={},
+        power_kw=np.array(power, dtype=float),
+        connector_types=np.array(["CCS2"] * n),
     )
 
 
-# EV with 200 km of range at 100% (40 kWh x 5 km/kWh).
-def ev(soc, target=80.0, reserve=15.0) -> EVParams:
+# EV with 200 km of range at 100% (40 kWh x 5 km/kWh), accepting up to 50 kW.
+def ev(soc, target=80.0, reserve=15.0, min_charger_kw=25.0) -> EVParams:
     return EVParams(
         capacity_kwh=40,
         efficiency_km_per_kwh=5,
         start_soc_pct=soc,
         reserve_pct=reserve,
         target_soc_pct=target,
-        charger_kw=50,
+        max_charge_kw=50,
+        min_charger_kw=min_charger_kw,
     )
 
 
-# --- station data cleaning --------------------------------------------------------------------
+# --- station data -----------------------------------------------------------------------------
 
 
-def test_load_stations_cleans_dataset(tmp_path):
+def test_load_stations_keeps_car_chargers_only(tmp_path):
     csv = tmp_path / "stations.csv"
     csv.write_text(
-        "name,state,city,address,latitude,longitude\n"
-        "Good,Delhi,new delhi,Addr,28.6,77.2\n"
-        "Good,Delhi,new delhi,Addr,28.6,77.2\n"  # duplicate
-        "Swapped,Karnataka,Bangalore,,77.59,12.89\n"  # lat/lon swapped
-        "Broken,Bihar,Patna,X,25.63,85105514\n"  # corrupted longitude
+        "name,operator,city,address,lat,lon,car_compatible,max_car_kw,connector_types\n"
+        "Fast,Tata Power,Delhi,Addr,28.6,77.2,True,60,CCS2\n"
+        "Scooters,Ather,Delhi,Addr,28.7,77.3,False,,LEV (2/3-wheeler)\n"
+        "Unknown power,BSES,Delhi,,28.5,77.1,True,,Type 2 AC\n"
+        "Bad coords,X,Patna,,25.6,851.1,True,30,CCS2\n"
     )
     st = load_stations(csv)
-    assert st.cleaning_report == {
-        "raw_rows": 4,
-        "swapped_fixed": 1,
-        "invalid_dropped": 1,
-        "duplicates_dropped": 1,
-        "clean_rows": 2,
-    }
-    assert list(st.cities) == ["New Delhi", "Bengaluru"]
-    assert (st.lat[1], st.lon[1]) == (12.89, 77.59)
+    assert list(st.names) == ["Fast", "Unknown power"]
+    assert list(st.power_kw) == [60.0, routing.UNKNOWN_POWER_KW]
 
 
 def test_real_dataset_loads(app):
     st = load_stations(app.config["CHARGING_STATIONS_PATH"])
-    assert len(st) > 1000
+    assert len(st) > 3000
     assert ((st.lat > 6) & (st.lat < 37.5) & (st.lon > 68) & (st.lon < 98)).all()
+    assert (st.power_kw > 0).all()
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("CCS", ("CCS2", True)),
+        ("CCS-2 (IS-17017-2-3)", ("CCS2", True)),
+        ("CHAdeMO", ("CHAdeMO", True)),
+        ("Type-II AC", ("Type 2 AC", True)),
+        ("Bharat AC", ("Bharat AC-001", True)),
+        ("Bharat DC-001", ("Bharat DC-001", True)),
+        ("LEV DC Charge Point\n(IS-17017-2-7)", ("LEV (2/3-wheeler)", False)),
+        ("LEV AC Charge point", ("LEV (2/3-wheeler)", False)),
+        ("something new", ("Other", False)),
+    ],
+)
+def test_connector_normalisation(raw, expected):
+    from scripts.build_charging_stations import normalise_connector
+
+    assert normalise_connector(raw) == expected
 
 
 # --- geocoding --------------------------------------------------------------------------------
@@ -214,10 +232,29 @@ def test_long_trip_stops_at_farthest_reachable_station():
     assert plan.total_min > plan.route.duration_min  # charging time included
 
 
+def test_slow_chargers_are_skipped_for_stops():
+    # Station 2 (~111 km) is a 7.4 kW AC charger, so the planner stops at Station 1 (~56 km)
+    # instead, the farthest *fast* charger in reach.
+    stations = stations_at(20.5, 21.0, 21.5, 22.2, kw=[60, 7.4, 60, 60])
+    plan = plan_trip(A, B, straight_route(), ev(90), stations)
+    assert "Station 2" not in [s.name for s in plan.stops]
+    assert all(s.station_kw >= 25 for s in plan.stops)
+    assert len(plan.nearby) == 4  # but every car charger is still shown on the map
+
+
+def test_charging_power_is_limited_by_station_and_car():
+    stations = stations_at(21.0, 22.0, kw=[150, 30])  # ~111 and ~222 km
+    plan = plan_trip(A, B, straight_route(), ev(90), stations)
+    first, second = plan.stops
+    assert (first.station_kw, first.charge_kw) == (150, 50)  # car accepts at most 50 kW
+    assert (second.station_kw, second.charge_kw) == (30, 30)  # station is the bottleneck
+    assert second.charge_min == pytest.approx(second.charge_kwh / 30 * 60, abs=1)
+
+
 def test_infeasible_gap_is_explained():
     plan = plan_trip(A, B, straight_route(), ev(90), stations_at(20.2))  # nothing after km 22
     assert not plan.feasible
-    assert "No charging station within reach" in plan.problem
+    assert "No charger of 25 kW or more within reach" in plan.problem
 
 
 def test_below_reserve_must_charge_first():
@@ -289,7 +326,8 @@ def test_planner_page_with_vehicle(client, manager, make_vehicle, mocked_service
             "destination": "end",
             "reserve_pct": 15,
             "target_soc_pct": 80,
-            "charger_kw": 50,
+            "max_charge_kw": 50,
+            "min_charger_kw": 25,
             "corridor_km": 10,
         },
     )
@@ -308,7 +346,8 @@ def test_planner_page_from_vehicle_location(client, manager, make_vehicle, mocke
             "destination": "end",
             "reserve_pct": 15,
             "target_soc_pct": 80,
-            "charger_kw": 50,
+            "max_charge_kw": 50,
+            "min_charger_kw": 25,
             "corridor_km": 10,
         },
     )
@@ -327,7 +366,8 @@ def test_planner_page_shows_errors(client, manager, mocked_services):
             "start_soc_pct": 80,
             "reserve_pct": 15,
             "target_soc_pct": 80,
-            "charger_kw": 50,
+            "max_charge_kw": 50,
+            "min_charger_kw": 25,
             "corridor_km": 10,
         },
     )
@@ -341,7 +381,8 @@ def test_planner_page_shows_errors(client, manager, mocked_services):
             "destination": "end",
             "reserve_pct": 15,
             "target_soc_pct": 80,
-            "charger_kw": 50,
+            "max_charge_kw": 50,
+            "min_charger_kw": 25,
             "corridor_km": 10,
         },
     )
@@ -362,7 +403,8 @@ def test_driver_cannot_plan_with_other_vehicle(
             "destination": "end",
             "reserve_pct": 15,
             "target_soc_pct": 80,
-            "charger_kw": 50,
+            "max_charge_kw": 50,
+            "min_charger_kw": 25,
             "corridor_km": 10,
         },
     )

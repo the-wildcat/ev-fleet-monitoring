@@ -1,69 +1,111 @@
 {
-  "model": "linear_regression",
-  "target": "Battery Health (%)",
+  "model": "random_forest",
+  "target": "SoH % (measured capacity / 2.0 Ah rated capacity)",
   "features": [
     {
-      "name": "capacity_mah",
-      "column": "Battery Capacity (mAh)",
-      "unit": "mAh"
-    },
-    {
       "name": "cycle_count",
-      "column": "Cycle Count",
-      "unit": "cycles"
+      "label": "Charge/discharge cycles",
+      "unit": "cycles",
+      "training_range": [
+        1.0,
+        197.0
+      ]
     },
     {
-      "name": "voltage_v",
-      "column": "Voltage (V)",
-      "unit": "V"
+      "name": "ambient_temperature_c",
+      "label": "Ambient temperature",
+      "unit": "\u00b0C",
+      "training_range": [
+        4.0,
+        44.0
+      ]
     },
     {
-      "name": "temperature_c",
-      "column": "Temperature (\u00b0C)",
-      "unit": "\u00b0C"
+      "name": "discharge_current_a",
+      "label": "Discharge current",
+      "unit": "A",
+      "training_range": [
+        0.99,
+        4.03
+      ]
+    },
+    {
+      "name": "avg_voltage_v",
+      "label": "Average voltage under load",
+      "unit": "V",
+      "training_range": [
+        2.81,
+        3.66
+      ]
+    },
+    {
+      "name": "max_temperature_c",
+      "label": "Peak cell temperature",
+      "unit": "\u00b0C",
+      "training_range": [
+        10.15,
+        69.87
+      ]
     },
     {
       "name": "internal_resistance_mohm",
-      "column": "Internal Resistance (m\u03a9)",
-      "unit": "m\u03a9"
+      "label": "Internal resistance",
+      "unit": "m\u03a9",
+      "training_range": [
+        67.68,
+        325.78
+      ]
     }
   ],
   "status_bands": {
-    "Good": ">= 75",
-    "Fair": "50 - 75",
-    "Needs Replacement": "< 50"
+    "Good": ">= 80",
+    "Fair": "70 - 80",
+    "Needs Replacement": "< 70"
   },
-  "cv": "RepeatedKFold(n_splits=5, n_repeats=3)",
+  "cv": "GroupKFold(n_splits=8) by battery (unseen-battery evaluation)",
   "metrics": {
     "baseline_mean": {
-      "mae": 14.109,
-      "mae_std": 1.545,
-      "rmse": 16.229,
-      "r2": -0.065
+      "mae": 12.517,
+      "rmse": 15.337,
+      "r2": -0.036,
+      "status_accuracy": 0.203,
+      "worst_battery_mae": 36.236
     },
     "linear_regression": {
-      "mae": 0.002,
-      "mae_std": 0.0,
-      "rmse": 0.003,
-      "r2": 1.0,
-      "status_accuracy": 1.0
+      "mae": 7.281,
+      "rmse": 8.846,
+      "r2": 0.655,
+      "status_accuracy": 0.666,
+      "worst_battery_mae": 16.087
     },
     "random_forest": {
-      "mae": 2.472,
-      "mae_std": 0.461,
-      "rmse": 3.131,
-      "r2": 0.958
+      "mae": 5.35,
+      "rmse": 6.878,
+      "r2": 0.792,
+      "status_accuracy": 0.745,
+      "worst_battery_mae": 15.424
     },
     "gradient_boosting": {
-      "mae": 1.653,
-      "mae_std": 0.33,
-      "rmse": 2.053,
-      "r2": 0.982
+      "mae": 6.057,
+      "rmse": 7.744,
+      "r2": 0.736,
+      "status_accuracy": 0.7,
+      "worst_battery_mae": 16.468
     }
   },
-  "training_rows": 100,
-  "dataset": "Battery_Health_Dataset.xlsx",
-  "dataset_sha256": "c5ddf481900241592cba64cc3e6ed578bf63028298ba4e1d6cb4dc50d3f172e6",
+  "feature_importance": {
+    "avg_voltage_v": 1.418,
+    "ambient_temperature_c": 0.7117,
+    "max_temperature_c": 0.257,
+    "cycle_count": 0.2487,
+    "discharge_current_a": 0.1855,
+    "internal_resistance_mohm": 0.0598
+  },
+  "training_rows": 2449,
+  "training_batteries": 32,
+  "dataset": "battery_cycles_nasa.csv",
+  "dataset_source": "NASA Ames PCoE Li-ion Battery Aging Data Set (Saha & Goebel, 2007)",
+  "dataset_sha256": "53b9682c06f118adc746d323b2a014993a744185ef0affdf8ab908c215875e66",
   "sklearn_version": "1.9.1",
-  "trained_at": "2026-10-04T09:43:49+00:00"
+  "trained_at": "2026-10-04T10:23:44+00:00"
 }
