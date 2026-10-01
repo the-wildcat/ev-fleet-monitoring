@@ -115,7 +115,7 @@ def main() -> None:
         print(f"  {feature:<26}{value:.3f}")
 
     MODEL_PATH.parent.mkdir(exist_ok=True)
-    joblib.dump(best, MODEL_PATH)
+    joblib.dump(best, MODEL_PATH, compress=3)  # ~5x smaller; same model
     training_ranges = {
         name: [round(float(X[name].min()), 2), round(float(X[name].max()), 2)]
         for name in FEATURE_NAMES

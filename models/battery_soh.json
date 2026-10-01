@@ -107,5 +107,5 @@
   "dataset_source": "NASA Ames PCoE Li-ion Battery Aging Data Set (Saha & Goebel, 2007)",
   "dataset_sha256": "53b9682c06f118adc746d323b2a014993a744185ef0affdf8ab908c215875e66",
   "sklearn_version": "1.9.1",
-  "trained_at": "2026-10-04T10:23:44+00:00"
+  "trained_at": "2026-10-04T10:56:49+00:00"
 }
