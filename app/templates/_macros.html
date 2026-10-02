@@ -44,6 +44,22 @@
   </div>
 {% endmacro %}
 
+{# Driver score with its band colour. #}
+{% macro score_badge(score, band) %}
+  {% if score is none %}
+    <span class="badge text-bg-light" title="{{ band }}">—</span>
+  {% else %}
+    {% set colour = {"Good": "success", "Fair": "warning", "Needs coaching": "danger"}.get(band, "secondary") %}
+    <span class="badge text-bg-{{ colour }} fs-6" title="{{ band }}">{{ "%.0f"|format(score) }}</span>
+  {% endif %}
+{% endmacro %}
+
+{# Signed percentage, red when worse than rated (positive = more energy). #}
+{% macro energy_delta(pct) %}
+  {% if pct is none %}<span class="text-muted">—</span>
+  {% else %}<span class="{{ 'text-danger' if pct > 5 else ('text-success' if pct < -5 else '') }}">{{ "%+.0f"|format(pct) }}%</span>{% endif %}
+{% endmacro %}
+
 {# Battery health (SoH) with its status colour. #}
 {% macro soh_badge(soh, status) %}
   {% set colour = {"Good": "success", "Fair": "warning", "Needs Replacement": "danger"}.get(status, "secondary") %}

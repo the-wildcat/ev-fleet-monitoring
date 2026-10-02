@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Alerts{% endblock %}
+
+{# Current filters with some values changed, e.g. filter_url(page=2). #}
+{% macro filter_url() -%}
+  {{ url_for('alerts.inbox', **dict(dict(status=status, **filters), **kwargs)) }}
+{%- endmacro %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+  <div>
+    <h1 class="h3 mb-0">Alerts</h1>
+    <p class="text-muted mb-0">Battery and maintenance alerts across {{ "your fleet" if current_user.is_manager else "your vehicles" }}.</p>
+  </div>
+  <ul class="nav nav-pills">
+    <li class="nav-item"><a class="nav-link {{ 'active' if status == 'open' }}" href="{{ filter_url(status='open', page=1) }}">Open</a></li>
+    <li class="nav-item"><a class="nav-link {{ 'active' if status == 'resolved' }}" href="{{ filter_url(status='resolved', page=1) }}">History</a></li>
+  </ul>
+</div>
+
+<form class="row g-2 align-items-end mb-3" method="get">
+  <input type="hidden" name="status" value="{{ status }}">
+  <div class="col-sm-4 col-lg-3">
+    <label class="form-label small" for="f-type">Type</label>
+    <select id="f-type" name="type" class="form-select form-select-sm">
+      <option value="">All types</option>
+      {% for t in alert_types %}<option value="{{ t.value }}" {{ "selected" if filters.type == t.value }}>{{ t.label }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-sm-4 col-lg-2">
+    <label class="form-label small" for="f-sev">Severity</label>
+    <select id="f-sev" name="severity" class="form-select form-select-sm">
+      <option value="">All</option>
+      <option value="critical" {{ "selected" if filters.severity == "critical" }}>Critical</option>
+      <option value="warning" {{ "selected" if filters.severity == "warning" }}>Warning</option>
+    </select>
+  </div>
+  <div class="col-sm-4 col-lg-3">
+    <label class="form-label small" for="f-veh">Vehicle</label>
+    <select id="f-veh" name="vehicle_id" class="form-select form-select-sm">
+      <option value="0">All vehicles</option>
+      {% for v in vehicles %}<option value="{{ v.id }}" {{ "selected" if filters.vehicle_id == v.id }}>{{ v.plate_number }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-auto"><button class="btn btn-sm btn-success">Filter</button></div>
+  <div class="col-auto"><a class="btn btn-sm btn-link" href="{{ url_for('alerts.inbox', status=status) }}">Clear</a></div>
+</form>
+
+<div class="card shadow-sm">
+  {% if alerts %}
+    <ul class="list-group list-group-flush">
+      {% for a in alerts %}
+        {% set critical = a.severity.value == "critical" %}
+        <li class="list-group-item {{ 'opacity-75' if a.acknowledged_at and a.is_open }}">
+          <div class="d-flex flex-wrap gap-3 align-items-start">
+            <i class="bi {{ 'bi-exclamation-octagon-fill text-danger' if critical else 'bi-exclamation-triangle-fill text-warning' }} fs-5"></i>
+            <div class="flex-grow-1">
+              <div>
+                <strong>{{ a.alert_type.label }}</strong>
+                <span class="badge {{ 'text-bg-danger' if critical else 'text-bg-warning' }}">{{ a.severity.value|title }}</span>
+                <span class="badge text-bg-light">{{ a.alert_type.category|title }}</span>
+                · <a href="{{ url_for('vehicles.vehicle_detail', vehicle_id=a.vehicle_id) }}">{{ a.vehicle.plate_number }}</a>
+                <span class="text-muted small">{{ a.vehicle.display_name }}</span>
+              </div>
+              <div>{{ a.message }}</div>
+              <div class="small text-muted">
+                Raised {{ a.created_at|localtime("%d %b, %H:%M") }}
+                {% if a.is_open %}· last seen {{ a.last_seen_at|localtime("%H:%M") }}{% endif %}
+                {% if a.acknowledged_at %}· acknowledged by {{ a.acknowledged_by.name if a.acknowledged_by else "—" }} {{ a.acknowledged_at|localtime("%d %b, %H:%M") }}{% endif %}
+                {% if not a.is_open %}
+                  · resolved {{ a.resolved_at|localtime("%d %b, %H:%M") }}
+                  {{ "by " ~ a.resolved_by.name if a.resolved_by else "automatically (condition cleared)" }}
+                {% endif %}
+              </div>
+              {% if a.resolution_note %}<div class="small mt-1"><i class="bi bi-chat-left-text"></i> {{ a.resolution_note }}</div>{% endif %}
+            </div>
+            {% if current_user.is_manager and a.is_open %}
+              <div class="d-flex gap-2 align-items-start">
+                {% if not a.acknowledged_at %}
+                  <form method="post" action="{{ url_for('alerts.acknowledge', alert_id=a.id) }}">
+                    {{ ack_form.csrf_token }}<input type="hidden" name="next" value="{{ request.full_path }}">
+                    <button class="btn btn-sm btn-outline-secondary">Acknowledge</button>
+                  </form>
+                {% endif %}
+                <button class="btn btn-sm btn-outline-success" type="button" data-bs-toggle="collapse" data-bs-target="#resolve-{{ a.id }}" aria-expanded="false">Resolve…</button>
+              </div>
+            {% endif %}
+          </div>
+          {% if current_user.is_manager and a.is_open %}
+            <div class="collapse mt-2" id="resolve-{{ a.id }}">
+              <form method="post" action="{{ url_for('alerts.resolve', alert_id=a.id) }}" class="d-flex gap-2">
+                {{ resolve_form.csrf_token }}<input type="hidden" name="next" value="{{ request.full_path }}">
+                <input name="note" class="form-control form-control-sm" maxlength="500" placeholder="What was done? (optional, e.g. 'Service booked for Monday')" aria-label="Resolution note">
+                <button class="btn btn-sm btn-success">Resolve</button>
+              </form>
+            </div>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="card-body text-muted">
+      {% if status == "open" %}<i class="bi bi-check-circle text-success"></i> No open alerts.{% else %}No resolved alerts yet.{% endif %}
+    </div>
+  {% endif %}
+  {% if pages > 1 %}
+    <div class="card-footer bg-white d-flex justify-content-between align-items-center small">
+      <span>{{ total }} alerts · page {{ page }} of {{ pages }}</span>
+      <span>
+        {% if page > 1 %}<a href="{{ filter_url(page=page - 1) }}">← Newer</a>{% endif %}
+        {% if page < pages %}<a class="ms-3" href="{{ filter_url(page=page + 1) }}">Older →</a>{% endif %}
+      </span>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

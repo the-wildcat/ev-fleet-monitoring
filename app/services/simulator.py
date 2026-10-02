@@ -8,7 +8,7 @@ Behaviour that later modules analyse is built in:
   * the battery drains with distance; below 20% the vehicle stops to charge;
   * each vehicle has a fixed "aggressiveness" (driving style): aggressive drivers brake and
     accelerate harder, speed more often and use more energy;
-  * occasional battery temperature spikes.
+  * rare thermal events (several minutes of high battery temperature).
 
 A tick of `interval` real seconds simulates `interval * time_scale` seconds of driving, so a
 demo shows visible movement and battery changes within minutes.
@@ -76,6 +76,9 @@ CITY_LOOPS: dict[str, list[tuple[float, float]]] = {
 LOW_SOC_PCT = 20.0  # start charging below this
 CHARGE_TARGET_PCT = 90.0  # stop charging at this
 CHARGER_KW = (7.2, 25.0, 50.0)  # AC, DC, fast DC
+# Per tick. At the default 5 s interval (3,600 ticks in 5 hours) that's about one thermal
+# event per vehicle every 5 hours.
+THERMAL_EVENT_PROBABILITY = 1 / 3600
 
 
 def haversine_km(a: tuple[float, float], b: tuple[float, float]) -> float:
@@ -101,6 +104,8 @@ class VehicleSim:
     speed_kmh: float = 0.0
     charging: bool = False
     charger_kw: float = 0.0
+    thermal_ticks: int = 0  # remaining ticks of an ongoing thermal event
+    thermal_extra_c: float = 0.0
     position: tuple[float, float] = field(init=False)
 
     def __post_init__(self) -> None:
@@ -145,14 +150,16 @@ class VehicleSim:
                 self.charging = False
         else:
             old_speed = self.speed_kmh
-            speeding = rng.random() < 0.04 * aggr  # e.g. on an arterial road
+            # Style affects risky events more than proportionally (calm 0.46x, aggressive 2.4x).
+            events = aggr**1.5
+            speeding = rng.random() < 0.02 * events  # e.g. on an arterial road
             new_speed = rng.uniform(75, 95) if speeding else rng.uniform(15, 60)
             # Peak acceleration within the interval; aggressive drivers have more harsh events.
             roll = rng.random()
-            if roll < 0.05 * aggr:
+            if roll < 0.012 * events:
                 accel = -rng.uniform(3.5, 6.5)  # harsh braking
                 new_speed = rng.uniform(5, 25)
-            elif roll < 0.09 * aggr:
+            elif roll < 0.022 * events:
                 accel = rng.uniform(2.8, 4.5)  # harsh acceleration
             else:
                 accel = rng.gauss(0, 0.5) + (new_speed - old_speed) / 3.6 / 10
@@ -175,8 +182,13 @@ class VehicleSim:
                 self.speed_kmh = 0.0
                 self.charger_kw = rng.choice(CHARGER_KW)
 
-        if rng.random() < 0.004:
-            temp += rng.uniform(15, 22)  # rare thermal spike (for battery alerts)
+        # Rare thermal events lasting several ticks (e.g. a cooling fault), for battery alerts.
+        if self.thermal_ticks == 0 and rng.random() < THERMAL_EVENT_PROBABILITY:
+            self.thermal_ticks = rng.randint(3, 8)
+            self.thermal_extra_c = rng.uniform(15, 25)
+        if self.thermal_ticks > 0:
+            temp += self.thermal_extra_c
+            self.thermal_ticks -= 1
 
         return {
             "lat": round(self.position[0], 6),

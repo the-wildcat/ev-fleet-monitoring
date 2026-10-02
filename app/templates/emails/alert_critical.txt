@@ -1,0 +1,15 @@
+Hi {{ user.name }},
+
+A critical alert needs attention:
+
+  Vehicle:  {{ alert.vehicle.plate_number }} ({{ alert.vehicle.display_name }})
+  Alert:    {{ alert.alert_type.label }}
+  Details:  {{ alert.message }}
+  Raised:   {{ alert.created_at|localtime }}
+
+Review and acknowledge it in the alerts inbox:
+{{ link }}
+
+You receive at most one email per vehicle and alert type every few hours.
+
+- EV Fleet Monitor

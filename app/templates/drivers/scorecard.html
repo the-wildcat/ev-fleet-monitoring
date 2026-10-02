@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% from "_macros.html" import score_badge, energy_delta %}
+{% block title %}{{ driver.name }} · driving{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-start mb-3 gap-2">
+  <div>
+    {% if current_user.is_manager %}
+      <a href="{{ url_for('drivers.leaderboard', days=days) }}" class="small text-decoration-none"><i class="bi bi-arrow-left"></i> All drivers</a>
+    {% endif %}
+    <h1 class="h3 mb-0">{{ driver.name }}</h1>
+    <p class="text-muted mb-0">{{ "Your driving" if driver.id == current_user.id else "Driving scorecard" }}{% if st %} · {{ st.vehicles|sort|join(", ") }}{% endif %}</p>
+  </div>
+  {% include "drivers/_period_tabs.html" %}
+</div>
+
+{% if not st %}
+  <div class="alert alert-info">No driving recorded in this period.</div>
+{% else %}
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3"><div class="card shadow-sm h-100"><div class="card-body">
+      <div class="text-muted small">Score</div>
+      <div class="fs-3">{{ score_badge(st.score, st.band) }}</div><div class="small text-muted">{{ st.band }}</div>
+    </div></div></div>
+    <div class="col-6 col-xl-3"><div class="card shadow-sm h-100"><div class="card-body">
+      <div class="text-muted small">Distance</div><div class="fs-3 fw-semibold">{{ "{:,.0f}".format(st.distance_km) }} km</div>
+    </div></div></div>
+    <div class="col-6 col-xl-3"><div class="card shadow-sm h-100"><div class="card-body">
+      <div class="text-muted small">Events</div><div class="fs-3 fw-semibold">{{ st.events }}</div>
+      <div class="small text-muted">{{ "%.1f"|format(st.per_100km(st.events)) if st.per_100km(st.events) is not none else "—" }} per 100 km</div>
+    </div></div></div>
+    <div class="col-6 col-xl-3"><div class="card shadow-sm h-100"><div class="card-body">
+      <div class="text-muted small">Energy vs vehicle rating</div><div class="fs-3 fw-semibold">{{ energy_delta(st.energy_vs_rated_pct) }}</div>
+      <div class="small text-muted">{{ "%.1f"|format(st.kwh_per_100km) if st.kwh_per_100km is not none else "—" }} kWh/100 km
+        {% if st.extra_cost_per_100km_inr is not none %}· {{ "%+.0f"|format(st.extra_cost_per_100km_inr) }} ₹/100 km{% endif %}</div>
+    </div></div></div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-lg-4">
+      <div class="card shadow-sm h-100">
+        <div class="card-header bg-white fw-semibold">Event breakdown</div>
+        <div class="card-body">
+          {% set rows = [("Harsh braking", st.harsh_brake, "danger"), ("Harsh acceleration", st.harsh_accel, "warning"), ("Speeding", st.speeding, "info")] %}
+          {% set biggest = [1] + rows|map(attribute=1)|list %}
+          {% for label, count, colour in rows %}
+            <div class="d-flex justify-content-between small"><span>{{ label }}</span><span>{{ count }}</span></div>
+            <div class="progress mb-3" style="height: 8px" role="progressbar" aria-label="{{ label }}" aria-valuenow="{{ count }}" aria-valuemin="0">
+              <div class="progress-bar bg-{{ colour }}" style="width: {{ (count / (biggest|max) * 100)|round }}%"></div>
+            </div>
+          {% endfor %}
+          {% set top = rows|sort(attribute=1, reverse=true)|first %}
+          {% if top[1] > 0 %}
+            <div class="alert alert-light small mb-0">
+              <i class="bi bi-lightbulb"></i> <strong>Coaching tip:</strong>
+              {% if top[0] == "Harsh braking" %}Keep a longer following distance and anticipate stops; regenerative braking recovers more energy when you slow down gradually.
+              {% elif top[0] == "Harsh acceleration" %}Accelerate smoothly; hard launches draw high power from the battery and raise its temperature.
+              {% else %}Keep to {{ cfg.SPEED_LIMIT_KMH|int }} km/h; energy use rises sharply with speed because of air resistance.{% endif %}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-8">
+      <div class="card shadow-sm h-100">
+        <div class="card-header bg-white fw-semibold">Daily trend</div>
+        <div class="card-body"><canvas id="trend" height="120" aria-label="Daily score and distance"></canvas></div>
+      </div>
+    </div>
+  </div>
+{% endif %}
+
+<div class="card shadow-sm">
+  <div class="card-header bg-white fw-semibold">Recent events</div>
+  {% if events %}
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light"><tr><th>When</th><th>Event</th><th>Detail</th><th>Vehicle</th><th>Where</th></tr></thead>
+        <tbody>
+          {% for e in events %}
+            <tr>
+              <td class="small">{{ e.at|localtime("%d %b, %H:%M") }}</td>
+              <td>{{ e.kind }}</td>
+              <td class="small">{{ e.detail }}{% if e.kind != "Speeding" %} at {{ "%.0f"|format(e.speed_kmh) }} km/h{% endif %}</td>
+              <td class="small">{{ e.plate }}</td>
+              <td class="small"><a href="https://www.openstreetmap.org/?mlat={{ e.lat }}&mlon={{ e.lon }}#map=16/{{ e.lat }}/{{ e.lon }}" target="_blank" rel="noopener">map <i class="bi bi-box-arrow-up-right"></i></a></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="card-body text-muted">No harsh or speeding events in this period. Great driving!</div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if st %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+(() => {
+  const trend = {{ trend|tojson }};
+  new Chart(document.getElementById("trend"), {
+    data: {
+      labels: trend.map((d) => d.day),
+      datasets: [
+        { type: "line", label: "Score", data: trend.map((d) => d.score), borderColor: "#2e7d32", yAxisID: "score", tension: 0.3, spanGaps: true },
+        { type: "bar", label: "Distance (km)", data: trend.map((d) => d.distance_km), backgroundColor: "rgba(25,118,210,.25)", yAxisID: "km" },
+      ],
+    },
+    options: {
+      scales: {
+        score: { position: "left", min: 0, max: 100, title: { display: true, text: "Score" } },
+        km: { position: "right", beginAtZero: true, grid: { drawOnChartArea: false }, title: { display: true, text: "km" } },
+      },
+    },
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

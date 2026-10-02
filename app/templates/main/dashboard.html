@@ -35,7 +35,7 @@
   <div class="card border-warning shadow-sm mb-4">
     <div class="card-header bg-warning-subtle d-flex justify-content-between align-items-center">
       <span class="fw-semibold"><i class="bi bi-bell"></i> Active alerts</span>
-      <a href="{{ url_for('battery.overview') }}" class="small">Battery health</a>
+      <a href="{{ url_for('alerts.inbox') }}" class="small">All alerts</a>
     </div>
     <ul class="list-group list-group-flush">
       {% for alert in alerts %}<li class="list-group-item">{{ alert_row(alert) }}</li>{% endfor %}

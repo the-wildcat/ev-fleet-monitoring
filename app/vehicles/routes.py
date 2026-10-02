@@ -18,6 +18,7 @@ from app.models import (
     Vehicle,
     VehicleStatus,
 )
+from app.services.maintenance import evaluate_vehicle
 from app.utils import utcnow
 from app.vehicles import bp
 from app.vehicles.access import get_visible_vehicle, visible_vehicles_stmt
@@ -210,6 +211,9 @@ def add_service_record(vehicle_id: int):
                 description=(form.description.data or "").strip(),
             )
         )
+        db.session.flush()
+        # Re-check maintenance rules now, so e.g. a "Service due" alert closes immediately.
+        evaluate_vehicle(vehicle)
         db.session.commit()
         flash("Service record added.", "success")
         return redirect(url_for("vehicles.vehicle_detail", vehicle_id=vehicle.id) + "#service")

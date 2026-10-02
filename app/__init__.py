@@ -41,10 +41,12 @@ def create_app(config_name: str | None = None) -> Flask:
 
     from app import models  # noqa: F401  (register tables and the user loader)
     from app.admin import bp as admin_bp
+    from app.alerts import bp as alerts_bp
     from app.api import bp as api_bp
     from app.auth import bp as auth_bp
     from app.battery import bp as battery_bp
     from app.cli import register_cli
+    from app.drivers import bp as drivers_bp
     from app.errors import register_error_handlers
     from app.main import bp as main_bp
     from app.monitoring import bp as monitoring_bp
@@ -60,6 +62,8 @@ def create_app(config_name: str | None = None) -> Flask:
         monitoring_bp,
         routing_bp,
         battery_bp,
+        drivers_bp,
+        alerts_bp,
         api_bp,
     ):
         app.register_blueprint(blueprint)
@@ -68,7 +72,7 @@ def create_app(config_name: str | None = None) -> Flask:
     register_error_handlers(app)
     register_cli(app)
     _register_template_filters(app)
-    _start_simulator_on_first_request(app)
+    _start_background_threads_on_first_request(app)
 
     app.logger.info("App started (env=%s)", config_name)
     return app
@@ -85,21 +89,29 @@ def _register_template_filters(app: Flask) -> None:
         return value.replace(tzinfo=UTC).astimezone(tz).strftime(fmt)
 
 
-def _start_simulator_on_first_request(app: Flask) -> None:
-    """Start the telemetry simulator when the web server handles its first request.
+def _start_background_threads_on_first_request(app: Flask) -> None:
+    """Start the telemetry simulator and background jobs with the first web request.
 
-    Starting it here (rather than in create_app) means CLI commands such as
-    `flask db upgrade` never spawn it, and with the debug reloader only the serving
-    process runs it.
+    Starting them here (rather than in create_app) means CLI commands such as
+    `flask db upgrade` never spawn them, and with the debug reloader only the serving
+    process runs them.
     """
-    if not app.config["SIMULATOR_ENABLED"] or app.testing:
+    if app.testing:
+        return
+    simulator, jobs = app.config["SIMULATOR_ENABLED"], app.config["BACKGROUND_JOBS_ENABLED"]
+    if not (simulator or jobs):
         return
 
     @app.before_request
-    def _ensure_simulator() -> None:
-        from app.services.simulator import start_background_simulator
+    def _ensure_background_threads() -> None:
+        if simulator:
+            from app.services.simulator import start_background_simulator
 
-        start_background_simulator(app)
+            start_background_simulator(app)
+        if jobs:
+            from app.services.jobs import start_background_jobs
+
+            start_background_jobs(app)
 
 
 def _configure_logging(app: Flask) -> None:

@@ -1,7 +1,5 @@
 """Registration, email verification, login/logout, password reset and profile."""
 
-from urllib.parse import urlsplit
-
 from flask import current_app, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -23,7 +21,7 @@ from app.auth.tokens import (
 from app.extensions import db
 from app.models import Role, User
 from app.services.email import send_email
-from app.utils import utcnow
+from app.utils import is_safe_redirect, utcnow
 
 # Checked against when an email isn't registered, so a failed login takes the same time
 # whether or not the account exists (prevents discovering accounts by timing).
@@ -39,14 +37,6 @@ def _send_verification(user: User) -> None:
     send_email(
         user.email, "Verify your EV Fleet Monitor account", "verify_email", user=user, link=link
     )
-
-
-def _is_safe_next(target: str | None) -> bool:
-    """Only allow redirects to paths on this site (blocks open-redirect attacks)."""
-    if not target:
-        return False
-    parts = urlsplit(target)
-    return not parts.scheme and not parts.netloc and target.startswith("/")
 
 
 # --- registration & verification ------------------------------------------------------------
@@ -157,7 +147,7 @@ def login():
         current_app.logger.info("Login: %s", user.email)
 
         next_url = request.args.get("next")
-        return redirect(next_url if _is_safe_next(next_url) else url_for("main.index"))
+        return redirect(next_url if is_safe_redirect(next_url) else url_for("main.index"))
 
     return render_template("auth/login.html", form=form)
 

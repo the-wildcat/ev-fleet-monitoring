@@ -78,6 +78,23 @@ def register_cli(app: Flask) -> None:
         except KeyboardInterrupt:
             click.echo("Simulator stopped.")
 
+    @app.cli.command("check-maintenance")
+    def check_maintenance() -> None:
+        """Run the maintenance alert rules for every vehicle now."""
+        from app.services.maintenance import run_maintenance_checks
+
+        click.echo(f"Checked {run_maintenance_checks()} vehicles.")
+
+    @app.cli.command("send-alert-emails")
+    def send_alert_emails() -> None:
+        """Email managers about open critical alerts not yet notified."""
+        from app.services.notifications import send_pending_alert_emails
+
+        if not app.config["ALERT_EMAILS_ENABLED"]:
+            raise click.ClickException("Set ALERT_EMAILS_ENABLED=true in .env first.")
+        with app.test_request_context(base_url=app.config["APP_BASE_URL"]):
+            click.echo(f"Sent {send_pending_alert_emails()} emails.")
+
     @app.cli.command("prune-telemetry")
     @click.option("--days", type=int, help="Keep this many days (default: retention setting).")
     def prune_telemetry(days: int | None) -> None:

@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% from "_macros.html" import score_badge, energy_delta %}
+{% block title %}Driver behaviour{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+  <div>
+    <h1 class="h3 mb-0">Driver behaviour</h1>
+    <p class="text-muted mb-0">Safety events per 100 km and their effect on energy use.</p>
+  </div>
+  {% include "drivers/_period_tabs.html" %}
+</div>
+
+{% set cards = [
+  ("people", "Drivers active", summary.drivers, ""),
+  ("signpost-2", "Distance driven", "{:,.0f} km".format(summary.distance_km), ""),
+  ("exclamation-triangle", "Events per 100 km", "%.1f"|format(summary.events_per_100km) if summary.events_per_100km is not none else "—", "harsh braking, acceleration, speeding"),
+  ("award", "Average score", "%.0f"|format(summary.avg_score) if summary.avg_score is not none else "—", summary.needs_coaching ~ " need coaching"),
+] %}
+<div class="row g-3 mb-4">
+  {% for icon, label, value, note in cards %}
+    <div class="col-sm-6 col-xl-3"><div class="card module-card shadow-sm h-100"><div class="card-body">
+      <div class="text-muted small"><i class="bi bi-{{ icon }}"></i> {{ label }}</div>
+      <div class="fs-3 fw-semibold">{{ value }}</div><div class="small text-muted">{{ note }}</div>
+    </div></div></div>
+  {% endfor %}
+</div>
+
+<div class="row g-4">
+  <div class="col-xl-8">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white fw-semibold">Leaderboard</div>
+      {% if stats %}
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>#</th><th>Driver</th><th class="text-end">Distance</th>
+                <th class="text-end" title="Harsh braking per 100 km">Brake</th>
+                <th class="text-end" title="Harsh acceleration per 100 km">Accel</th>
+                <th class="text-end" title="Speeding per 100 km">Speed</th>
+                <th class="text-center">Score</th>
+                <th class="text-end" title="Energy used vs the vehicle's rated consumption">Energy vs rated</th>
+                <th class="text-end" title="Extra (or saved) energy cost per 100 km">Cost / 100 km</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in stats %}
+                <tr>
+                  <td class="text-muted">{{ loop.index if s.score is not none else "" }}</td>
+                  <td><a href="{{ url_for('drivers.scorecard', driver_id=s.driver_id, days=days) }}">{{ s.name }}</a>
+                    <div class="small text-muted">{{ s.vehicles|sort|join(", ") }}</div></td>
+                  <td class="text-end">{{ "{:,.0f}".format(s.distance_km) }} km</td>
+                  {% for count in (s.harsh_brake, s.harsh_accel, s.speeding) %}
+                    <td class="text-end">{{ "%.1f"|format(s.per_100km(count)) if s.per_100km(count) is not none else "—" }}</td>
+                  {% endfor %}
+                  <td class="text-center">{{ score_badge(s.score, s.band) }}</td>
+                  <td class="text-end">{{ energy_delta(s.energy_vs_rated_pct) }}</td>
+                  <td class="text-end small">{{ "%+.0f ₹"|format(s.extra_cost_per_100km_inr) if s.extra_cost_per_100km_inr is not none else "—" }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="card-body text-muted">No driving recorded for assigned drivers in this period. Assign drivers to vehicles to start scoring.</div>
+      {% endif %}
+      {% if idle %}
+        <div class="card-footer bg-white small text-muted">No driving this period: {{ idle|map(attribute="name")|join(", ") }}</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="col-xl-4">
+    <div class="card shadow-sm mb-4">
+      <div class="card-header bg-white fw-semibold">Safety vs energy</div>
+      <div class="card-body">
+        <canvas id="scatter" height="260" aria-label="Driver score against energy use"></canvas>
+        <p class="small text-muted mb-0 mt-2">Each dot is a driver. Lower scores (more harsh events) tend to use more energy than the vehicle's rating.</p>
+      </div>
+    </div>
+    <div class="card shadow-sm">
+      <div class="card-header bg-white fw-semibold">How scores work</div>
+      <div class="card-body small">
+        <p class="mb-2">Score = 100 − (4 × harsh braking + 3 × harsh acceleration + 2 × speeding), each counted <strong>per 100 km</strong>.</p>
+        <ul class="mb-2">
+          <li>Harsh braking: ≤ {{ cfg.HARSH_BRAKE_MPS2 }} m/s²</li>
+          <li>Harsh acceleration: ≥ {{ cfg.HARSH_ACCEL_MPS2 }} m/s²</li>
+          <li>Speeding: over {{ cfg.SPEED_LIMIT_KMH|int }} km/h</li>
+        </ul>
+        <p class="mb-0">Good ≥ {{ good }}, Fair ≥ {{ fair }}, below that: needs coaching. At least {{ cfg.MIN_SCORING_DISTANCE_KM|int }} km is needed for a score.
+          Energy cost uses ₹{{ cfg.ENERGY_TARIFF_INR_PER_KWH|int }}/kWh.</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+(() => {
+  const data = {{ scatter|tojson }};
+  new Chart(document.getElementById("scatter"), {
+    type: "scatter",
+    data: { datasets: [{ label: "Drivers", data, pointRadius: 6, backgroundColor: "#2e7d32" }] },
+    options: {
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: (c) => `${c.raw.name}: score ${c.raw.x}, energy ${c.raw.y > 0 ? "+" : ""}${c.raw.y}%` } } },
+      scales: {
+        x: { title: { display: true, text: "Driver score" }, min: 0, max: 100 },
+        y: { title: { display: true, text: "Energy vs rated (%)" } },
+      },
+    },
+  });
+})();
+</script>
+{% endblock %}

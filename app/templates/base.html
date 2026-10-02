@@ -20,8 +20,8 @@
     ("monitoring.live", "geo-alt", "Live Monitoring"),
     ("routing.plan", "signpost-split", "Route Planner"),
     ("battery.overview", "battery-half", "Battery Health"),
-    (None, "person-badge", "Driver Behaviour"),
-    (None, "tools", "Maintenance Alerts"),
+    ("drivers.leaderboard", "person-badge", "Driver Behaviour"),
+    ("alerts.inbox", "bell", "Alerts"),
     (None, "lightning-charge", "Energy & Cost"),
     (None, "file-earmark-bar-graph", "Reports"),
   ] %}
@@ -38,6 +38,10 @@
               {% if endpoint %}
                 <a class="nav-link {{ 'active' if request.endpoint == endpoint or (request.blueprint and endpoint.startswith(request.blueprint ~ '.') and request.blueprint != 'main') }}" href="{{ url_for(endpoint) }}">
                   <i class="bi bi-{{ icon }}"></i> {{ label }}
+                  {% if endpoint == "alerts.inbox" %}
+                    {% set n = open_alert_count() %}
+                    {% if n %}<span class="badge rounded-pill text-bg-warning ms-auto" title="Open alerts">{{ n }}</span>{% endif %}
+                  {% endif %}
                 </a>
               {% else %}
                 <span class="nav-link disabled" aria-disabled="true">

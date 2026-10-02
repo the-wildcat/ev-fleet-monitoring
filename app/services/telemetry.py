@@ -89,7 +89,7 @@ def _parse_timestamp(value: object) -> datetime | None:
 
 def record_reading(vehicle: Vehicle, data: dict) -> Telemetry:
     """Store a validated reading and refresh the vehicle's latest state. Caller commits."""
-    reading = Telemetry(vehicle_id=vehicle.id, **data)
+    reading = Telemetry(vehicle_id=vehicle.id, driver_id=vehicle.driver_id, **data)
     db.session.add(reading)
 
     # Devices may send buffered readings late or out of order; only newer ones update

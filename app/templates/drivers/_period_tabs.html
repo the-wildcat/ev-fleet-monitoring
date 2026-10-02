@@ -1,0 +1,7 @@
+<ul class="nav nav-pills nav-sm">
+  {% for d, label in periods.items() %}
+    <li class="nav-item">
+      <a class="nav-link py-1 {{ 'active' if d == days }}" href="{{ url_for(request.endpoint, days=d, **request.view_args) }}">{{ label }}</a>
+    </li>
+  {% endfor %}
+</ul>

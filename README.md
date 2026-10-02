@@ -3,9 +3,9 @@
 Real-Time EV Fleet Monitoring and Predictive Analytics Solution, an Infosys Springboard
 internship project being rebuilt module by module to production standards.
 
-> **Status:** Phase 0 (foundation) and Modules 1–3 (authentication and roles; EV registration
-> and real-time monitoring; route optimisation and battery health) are complete. Modules 4–6
-> are in progress; see the roadmap below. Full documentation will be added in the delivery phase.
+> **Status:** Phase 0 (foundation) and Modules 1–4 (authentication and roles; EV registration
+> and real-time monitoring; route optimisation and battery health; driver behaviour and
+> maintenance alerts) are complete. Modules 5–6 are in progress; see the roadmap below.
 
 ## Quick start (Windows / PowerShell)
 
@@ -122,6 +122,44 @@ or the vehicle's current location:
 The wear thresholds follow EV practice: 80% is the usual end-of-first-life mark, and battery
 warranties typically guarantee 70%.
 
+## Driver behaviour
+
+`/drivers` (managers: fleet leaderboard; drivers: their own scorecard) analyses telemetry for
+today, the last 7 days or the last 30 days:
+
+- **Events:** harsh braking (≤ −3.5 m/s², about 0.35 g), harsh acceleration (≥ 3.0 m/s²) and
+  speeding (above `SPEED_LIMIT_KMH`, default 80), counted **per 100 km** so drivers who cover
+  more distance aren't penalised.
+- **Score** = 100 − (4 × braking + 3 × acceleration + 2 × speeding) per 100 km. Good ≥ 85,
+  Fair ≥ 70, otherwise "needs coaching". At least 5 km of driving is needed for a score.
+- **Energy impact:** energy actually used (from battery-charge drops while driving) compared
+  with what the vehicle's rated efficiency predicts for the same distance, plus the extra cost
+  per 100 km at `ENERGY_TARIFF_INR_PER_KWH`. Comparing against each vehicle's own rating keeps
+  vehicle size from skewing driver comparisons.
+- Each reading records the driver assigned at that moment, so reassigning a vehicle doesn't
+  move past driving to the new driver.
+- The scorecard shows a daily trend, an event breakdown with a coaching tip, and recent events
+  with map links.
+
+## Maintenance alerts and the alerts inbox
+
+Rules run automatically every 10 minutes in the background (or with `flask check-maintenance`):
+
+| Alert | Rule |
+|---|---|
+| Service due | Routine service every 10,000 km or 12 months: warning when due (or within 500 km), critical 1,000 km past the interval. Adding a routine service record closes it. |
+| Brake inspection | 20 or more harsh-braking events in 7 days; closes after a brake service or when events drop. |
+| Battery check due | No battery health check for 180 days. |
+| Device offline | An active vehicle has sent no data for 24 hours. |
+
+`/alerts` lists all battery and maintenance alerts with filters (type, severity, vehicle) and a
+history tab. Managers can **acknowledge** alerts or **resolve** them with a note. An alert
+reopens automatically if its rule fires again. The sidebar shows the number of open alerts.
+
+**Email notifications** (`ALERT_EMAILS_ENABLED=true`): managers and admins are emailed about new
+critical alerts by the background jobs, at most once per vehicle and alert type every 6 hours.
+`flask send-alert-emails` sends pending ones manually.
+
 ## Data sources
 
 Both datasets are real and rebuilt from their official sources by scripts in `scripts/`.
@@ -149,10 +187,14 @@ app/            Flask application (app factory, blueprints, templates, static fi
   monitoring/   live fleet map and its JSON feed
   routing/      route planner page
   battery/      battery health page (ML checks, alerts)
+  drivers/      driver behaviour leaderboard and scorecards
+  alerts/       alerts inbox (acknowledge, resolve, history)
   api/          versioned JSON API (/api/v1): telemetry ingest, battery prediction
-  services/     email, telemetry, simulator, alerts, routing, battery model
+  services/     email, telemetry, simulator, alerts, routing, battery model, driving,
+                maintenance rules, notifications, background jobs
   main/         overview dashboard and /healthz endpoint
-  cli.py        create-admin, set-role, send-test-email, seed-vehicles, simulate, prune-telemetry
+  cli.py        create-admin, set-role, send-test-email, seed-vehicles, simulate,
+                prune-telemetry, check-maintenance, send-alert-emails
 migrations/     database schema versions (Alembic via Flask-Migrate)
 scripts/        rebuild datasets from their official sources
 ml/             model training script and model card
@@ -171,7 +213,7 @@ wsgi.py         entry point for `flask run` and gunicorn
 | 1 | User authentication, email verification, roles | Done |
 | 2 | EV registration and real-time monitoring | Done |
 | 3 | Route optimisation and battery health (ML) | Done |
-| 4 | Driver behaviour and maintenance alerts | Planned |
+| 4 | Driver behaviour and maintenance alerts | Done |
 | 5 | Energy and cost analysis | Planned |
 | 6 | Report generation | Planned |
 | 7 | Admin, Docker, CI, deployment | Planned |

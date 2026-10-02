@@ -14,17 +14,34 @@ if TYPE_CHECKING:
 
 
 class AlertType(enum.StrEnum):
+    # Battery (raised from live telemetry and battery checks)
     LOW_BATTERY = "low_battery"
     BATTERY_OVERHEAT = "battery_overheat"
     BATTERY_DEGRADED = "battery_degraded"
+    # Maintenance (raised by the scheduled maintenance rules)
+    SERVICE_DUE = "service_due"
+    BRAKE_INSPECTION = "brake_inspection"
+    BATTERY_CHECK_DUE = "battery_check_due"
+    DEVICE_OFFLINE = "device_offline"
 
     @property
     def label(self) -> str:
-        return {
-            "low_battery": "Low battery",
-            "battery_overheat": "Battery overheating",
-            "battery_degraded": "Battery wear",
-        }[self.value]
+        return _ALERT_LABELS[self.value]
+
+    @property
+    def category(self) -> str:
+        return "battery" if self.value.startswith(("low_battery", "battery_")) else "maintenance"
+
+
+_ALERT_LABELS = {
+    "low_battery": "Low battery",
+    "battery_overheat": "Battery overheating",
+    "battery_degraded": "Battery wear",
+    "service_due": "Service due",
+    "brake_inspection": "Brake inspection",
+    "battery_check_due": "Battery check due",
+    "device_offline": "Device offline",
+}
 
 
 class AlertSeverity(enum.StrEnum):
@@ -70,9 +87,15 @@ class Alert(db.Model):
     acknowledged_by_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL")
     )
+    # Set when a person closes the alert by hand (automatic resolutions leave these empty).
+    resolved_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    resolution_note: Mapped[str | None] = mapped_column(String(500))
+    # When managers were emailed about this alert (critical alerts only).
+    notified_at: Mapped[datetime | None]
 
     vehicle: Mapped["Vehicle"] = relationship()
-    acknowledged_by: Mapped["User | None"] = relationship()
+    acknowledged_by: Mapped["User | None"] = relationship(foreign_keys=[acknowledged_by_id])
+    resolved_by: Mapped["User | None"] = relationship(foreign_keys=[resolved_by_id])
 
     @property
     def is_open(self) -> bool:

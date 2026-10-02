@@ -15,6 +15,11 @@ class Telemetry(db.Model):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     vehicle_id: Mapped[int] = mapped_column(ForeignKey("vehicles.id", ondelete="CASCADE"))
+    # Who was assigned to the vehicle when the reading was taken, so driving is credited to
+    # the right person even after the vehicle is reassigned.
+    driver_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), index=True
+    )
     recorded_at: Mapped[datetime] = mapped_column(index=True)
     lat: Mapped[float]
     lon: Mapped[float]
