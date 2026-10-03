@@ -42,6 +42,7 @@ def create_app(config_name: str | None = None) -> Flask:
     from app import models  # noqa: F401  (register tables and the user loader)
     from app.admin import bp as admin_bp
     from app.alerts import bp as alerts_bp
+    from app.analytics import bp as analytics_bp
     from app.api import bp as api_bp
     from app.auth import bp as auth_bp
     from app.battery import bp as battery_bp
@@ -64,6 +65,7 @@ def create_app(config_name: str | None = None) -> Flask:
         battery_bp,
         drivers_bp,
         alerts_bp,
+        analytics_bp,
         api_bp,
     ):
         app.register_blueprint(blueprint)

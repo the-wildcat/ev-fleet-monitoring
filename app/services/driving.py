@@ -3,7 +3,7 @@
 Events (one per reading at most, per type):
   * harsh braking       acceleration <= HARSH_BRAKE_MPS2   (about -0.35 g)
   * harsh acceleration  acceleration >= HARSH_ACCEL_MPS2   (about +0.3 g)
-  * speeding            speed > SPEED_LIMIT_KMH while driving
+  * speeding            speed > the fleet speed limit setting while driving
 
 Score = 100 - sum(weight x events per 100 km), floored at 0. Normalising by distance means a
 driver who covers more kilometres isn't penalised for driving more.
@@ -26,6 +26,7 @@ from sqlalchemy import and_, case, func
 
 from app.extensions import db
 from app.models import Telemetry, User, Vehicle
+from app.services.settings import get_setting
 from app.utils import utcnow
 
 GOOD_SCORE = 85
@@ -78,7 +79,7 @@ class DriverStats:
     def extra_cost_per_100km_inr(self) -> float | None:
         if self.distance_km <= 0:
             return None
-        tariff = current_app.config["ENERGY_TARIFF_INR_PER_KWH"]
+        tariff = get_setting("energy_tariff_inr_per_kwh")
         return (self.energy_kwh - self.expected_kwh) / self.distance_km * 100 * tariff
 
     @property
@@ -92,7 +93,9 @@ def _event_columns():
     return (
         func.sum(case((Telemetry.acceleration_mps2 <= cfg["HARSH_BRAKE_MPS2"], 1), else_=0)),
         func.sum(case((Telemetry.acceleration_mps2 >= cfg["HARSH_ACCEL_MPS2"], 1), else_=0)),
-        func.sum(case((and_(driving, Telemetry.speed_kmh > cfg["SPEED_LIMIT_KMH"]), 1), else_=0)),
+        func.sum(
+            case((and_(driving, Telemetry.speed_kmh > get_setting("speed_limit_kmh")), 1), else_=0)
+        ),
     )
 
 
@@ -262,7 +265,10 @@ def recent_events(driver_id: int, since: datetime, limit: int = 50) -> list[dict
             Telemetry.recorded_at >= since,
             (Telemetry.acceleration_mps2 <= cfg["HARSH_BRAKE_MPS2"])
             | (Telemetry.acceleration_mps2 >= cfg["HARSH_ACCEL_MPS2"])
-            | (Telemetry.is_charging.is_(False) & (Telemetry.speed_kmh > cfg["SPEED_LIMIT_KMH"])),
+            | (
+                Telemetry.is_charging.is_(False)
+                & (Telemetry.speed_kmh > get_setting("speed_limit_kmh"))
+            ),
         )
         .order_by(Telemetry.recorded_at.desc())
         .limit(limit)

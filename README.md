@@ -3,9 +3,10 @@
 Real-Time EV Fleet Monitoring and Predictive Analytics Solution, an Infosys Springboard
 internship project being rebuilt module by module to production standards.
 
-> **Status:** Phase 0 (foundation) and Modules 1–4 (authentication and roles; EV registration
+> **Status:** Phase 0 (foundation) and Modules 1–5 (authentication and roles; EV registration
 > and real-time monitoring; route optimisation and battery health; driver behaviour and
-> maintenance alerts) are complete. Modules 5–6 are in progress; see the roadmap below.
+> maintenance alerts; energy and cost analysis) are complete. Module 6 (reports) and delivery
+> are in progress; see the roadmap below.
 
 ## Quick start (Windows / PowerShell)
 
@@ -160,6 +161,31 @@ reopens automatically if its rule fires again. The sidebar shows the number of o
 critical alerts by the background jobs, at most once per vehicle and alert type every 6 hours.
 `flask send-alert-emails` sends pending ones manually.
 
+## Energy and cost analysis
+
+`/analytics` covers the last 7, 30 or 90 days for the whole fleet or one vehicle (drivers see
+their own vehicles):
+
+| Figure | How it's calculated |
+|---|---|
+| Energy used | Battery-charge drops between readings while driving × battery capacity |
+| Charging | Charge added while plugged in ÷ charging efficiency = electricity bought, and its cost |
+| Energy cost | Energy used ÷ charging efficiency × tariff. Cost per km is based on *consumption*, so it doesn't swing with when vehicles happen to charge (standard fleet cost accounting). |
+| Operating cost | Energy cost + service-record costs in the period |
+| kWh/100 km vs rated | Each vehicle's consumption compared with its rated efficiency |
+| Saved vs petrol | Petrol cost for the same distance (default 15 km/L at ₹105/L) minus energy cost |
+| CO₂ avoided | Petrol at 2.31 kg/L minus grid electricity for the energy used at India's average 0.72 kg/kWh (Central Electricity Authority) |
+
+**Storage:** a background job rolls telemetry up into one `daily_energy` row per vehicle per
+local (IST) day every hour, and the page refreshes today's row every few minutes. The history
+survives when raw telemetry is pruned, and long periods load quickly. Each day stores the tariff
+that applied, so changing the tariff doesn't rewrite past costs. `flask rollup-energy --days N`
+rebuilds past days.
+
+**Settings** (`/admin/settings`, admins): electricity tariff, charging efficiency, petrol price,
+comparable petrol mileage and the fleet speed limit. Defaults come from `.env`; changes apply
+immediately.
+
 ## Data sources
 
 Both datasets are real and rebuilt from their official sources by scripts in `scripts/`.
@@ -182,19 +208,20 @@ app/            Flask application (app factory, blueprints, templates, static fi
   extensions.py database, migrations, login and CSRF extensions
   models/       database tables (SQLAlchemy)
   auth/         sign-up, email verification, login/logout, password reset, profile, roles
-  admin/        user management for administrators
+  admin/        user management and system settings for administrators
   vehicles/     EV registration, details, service history, device API keys
   monitoring/   live fleet map and its JSON feed
   routing/      route planner page
   battery/      battery health page (ML checks, alerts)
   drivers/      driver behaviour leaderboard and scorecards
   alerts/       alerts inbox (acknowledge, resolve, history)
+  analytics/    energy and cost analysis
   api/          versioned JSON API (/api/v1): telemetry ingest, battery prediction
   services/     email, telemetry, simulator, alerts, routing, battery model, driving,
-                maintenance rules, notifications, background jobs
+                maintenance rules, notifications, background jobs, energy roll-up, settings
   main/         overview dashboard and /healthz endpoint
   cli.py        create-admin, set-role, send-test-email, seed-vehicles, simulate,
-                prune-telemetry, check-maintenance, send-alert-emails
+                prune-telemetry, check-maintenance, send-alert-emails, rollup-energy
 migrations/     database schema versions (Alembic via Flask-Migrate)
 scripts/        rebuild datasets from their official sources
 ml/             model training script and model card
@@ -214,6 +241,6 @@ wsgi.py         entry point for `flask run` and gunicorn
 | 2 | EV registration and real-time monitoring | Done |
 | 3 | Route optimisation and battery health (ML) | Done |
 | 4 | Driver behaviour and maintenance alerts | Done |
-| 5 | Energy and cost analysis | Planned |
+| 5 | Energy and cost analysis | Done |
 | 6 | Report generation | Planned |
 | 7 | Admin, Docker, CI, deployment | Planned |

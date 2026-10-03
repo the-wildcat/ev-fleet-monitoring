@@ -86,10 +86,10 @@
         <ul class="mb-2">
           <li>Harsh braking: ≤ {{ cfg.HARSH_BRAKE_MPS2 }} m/s²</li>
           <li>Harsh acceleration: ≥ {{ cfg.HARSH_ACCEL_MPS2 }} m/s²</li>
-          <li>Speeding: over {{ cfg.SPEED_LIMIT_KMH|int }} km/h</li>
+          <li>Speeding: over {{ settings.speed_limit_kmh|int }} km/h</li>
         </ul>
         <p class="mb-0">Good ≥ {{ good }}, Fair ≥ {{ fair }}, below that: needs coaching. At least {{ cfg.MIN_SCORING_DISTANCE_KM|int }} km is needed for a score.
-          Energy cost uses ₹{{ cfg.ENERGY_TARIFF_INR_PER_KWH|int }}/kWh.</p>
+          Energy cost uses ₹{{ settings.energy_tariff_inr_per_kwh|int }}/kWh.</p>
       </div>
     </div>
   </div>

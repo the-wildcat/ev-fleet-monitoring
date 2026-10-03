@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% from "_macros.html" import energy_delta %}
+{% block title %}Energy & cost{% endblock %}
+
+{% macro inr(value, digits=0) -%}
+  {%- if value is none -%}—{%- else -%}₹{{ ("{:,.%df}" % digits).format(value) }}{%- endif -%}
+{%- endmacro %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+  <div>
+    <h1 class="h3 mb-0">Energy &amp; cost</h1>
+    <p class="text-muted mb-0">{{ report.first.strftime("%d %b") }} – {{ report.last.strftime("%d %b %Y") }} ·
+      {{ selected_plate or "all vehicles" }}</p>
+  </div>
+  <form class="d-flex flex-wrap gap-2" method="get">
+    <select name="vehicle_id" class="form-select form-select-sm" aria-label="Vehicle" onchange="this.form.submit()">
+      <option value="0">All vehicles</option>
+      {% for v in vehicles %}<option value="{{ v.id }}" {{ "selected" if v.id == vehicle_id }}>{{ v.plate_number }}</option>{% endfor %}
+    </select>
+    <select name="days" class="form-select form-select-sm" aria-label="Period" onchange="this.form.submit()">
+      {% for d, label in periods.items() %}<option value="{{ d }}" {{ "selected" if d == days }}>{{ label }}</option>{% endfor %}
+    </select>
+    <noscript><button class="btn btn-sm btn-success">Apply</button></noscript>
+  </form>
+</div>
+
+{% set r = report %}
+{% set cards = [
+  ("signpost-2", "Distance", "{:,.0f} km".format(r.distance_km), ""),
+  ("lightning-charge", "Energy used", "{:,.0f} kWh".format(r.used_kwh),
+     ("%.1f kWh/100 km"|format(r.kwh_per_100km)) if r.kwh_per_100km is not none else ""),
+  ("plug", "Charging (grid)", "{:,.0f} kWh".format(r.grid_kwh), inr(r.charging_cost) ~ " spent on charging"),
+  ("currency-rupee", "Operating cost", inr(r.total_cost),
+     inr(r.energy_cost) ~ " energy + " ~ inr(r.maintenance_cost) ~ " maintenance"),
+  ("speedometer", "Cost per km", inr(r.cost_per_km, 2), "energy only: " ~ inr(r.energy_cost_per_km, 2)),
+  ("piggy-bank", "Saved vs petrol", inr(r.savings_vs_petrol), "fuel cost " ~ inr(r.petrol_cost) ~ " for the same distance"),
+  ("tree", "CO₂ avoided", "{:,.0f} kg".format(r.co2_avoided_kg), "vs petrol, after grid emissions"),
+] %}
+<div class="row g-3 mb-4">
+  {% for icon, label, value, note in cards %}
+    <div class="col-sm-6 col-xl-3"><div class="card module-card shadow-sm h-100"><div class="card-body">
+      <div class="text-muted small"><i class="bi bi-{{ icon }}"></i> {{ label }}</div>
+      <div class="fs-4 fw-semibold">{{ value }}</div><div class="small text-muted">{{ note }}</div>
+    </div></div></div>
+  {% endfor %}
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-xl-6"><div class="card shadow-sm h-100">
+    <div class="card-header bg-white fw-semibold">Daily energy</div>
+    <div class="card-body"><canvas id="energy-chart" height="150" aria-label="Daily energy used and charged"></canvas></div>
+  </div></div>
+  <div class="col-xl-6"><div class="card shadow-sm h-100">
+    <div class="card-header bg-white fw-semibold">Daily operating cost</div>
+    <div class="card-body"><canvas id="cost-chart" height="150" aria-label="Daily energy and maintenance cost"></canvas></div>
+  </div></div>
+</div>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-header bg-white fw-semibold">By vehicle</div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light"><tr>
+        <th>Vehicle</th><th class="text-end">Distance</th><th class="text-end">kWh/100 km</th>
+        <th class="text-end" title="Consumption compared with the vehicle's rated efficiency">vs rated</th>
+        <th class="text-end">Energy cost</th><th class="text-end">Maintenance</th><th class="text-end">Total</th><th class="text-end">Cost/km</th>
+      </tr></thead>
+      <tbody>
+        {% for v in r.vehicles %}
+          <tr>
+            <td><a href="{{ url_for('vehicles.vehicle_detail', vehicle_id=v.vehicle.id) }}">{{ v.vehicle.plate_number }}</a>
+              <div class="small text-muted">{{ v.vehicle.display_name }} · rated {{ "%.1f"|format(v.rated_kwh_per_100km) }} kWh/100 km</div></td>
+            <td class="text-end">{{ "{:,.0f}".format(v.distance_km) }} km</td>
+            <td class="text-end">{{ "%.1f"|format(v.kwh_per_100km) if v.kwh_per_100km is not none else "—" }}</td>
+            <td class="text-end">{{ energy_delta(v.vs_rated_pct) }}</td>
+            <td class="text-end">{{ inr(v.energy_cost) }}</td>
+            <td class="text-end">{{ inr(v.maintenance_cost) }}</td>
+            <td class="text-end fw-semibold">{{ inr(v.total_cost) }}</td>
+            <td class="text-end">{{ inr(v.cost_per_km, 2) }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="8" class="text-muted">No vehicles to show.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<details class="small text-muted">
+  <summary>How these numbers are calculated</summary>
+  <ul class="mt-2">
+    <li><strong>Energy used</strong>: drops in battery charge between readings while driving × battery capacity.</li>
+    <li><strong>Energy cost</strong> (used for cost per km): energy used ÷ charging efficiency ({{ report.settings.charging_efficiency_pct|int }}%) × tariff
+      (currently ₹{{ "%g"|format(report.settings.energy_tariff_inr_per_kwh) }}/kWh; each day keeps the tariff that applied then). Basing cost on consumption
+      keeps cost per km stable no matter when vehicles charge.</li>
+    <li><strong>Charging</strong>: charge added while plugged in ÷ charging efficiency = electricity bought, and what was spent on it (matches the bill).</li>
+    <li><strong>Maintenance</strong>: costs entered on service records in this period.</li>
+    <li><strong>Petrol comparison</strong>: same distance at {{ "%g"|format(r.settings.ice_km_per_l) }} km/L and ₹{{ "%g"|format(r.settings.petrol_price_inr_per_l) }}/L.
+      CO₂ compares {{ config.PETROL_EMISSION_KG_PER_L }} kg/L for petrol with the grid electricity behind the energy used, at India's average of {{ config.GRID_EMISSION_KG_PER_KWH }} kg/kWh (CEA).</li>
+    <li>Figures are rolled up into daily totals every hour (today's refresh every few minutes), so they persist after raw telemetry is pruned.
+      Admins can change tariff and comparison values in Settings.</li>
+  </ul>
+</details>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+(() => {
+  const daily = {{ report.daily|tojson }};
+  const labels = daily.map((d) => d.day.slice(5));
+  new Chart(document.getElementById("energy-chart"), {
+    type: "bar",
+    data: { labels, datasets: [
+      { label: "Used while driving (kWh)", data: daily.map((d) => d.used), backgroundColor: "#2e7d32" },
+      { label: "Bought from grid (kWh)", data: daily.map((d) => d.grid), backgroundColor: "rgba(13,110,253,.55)" },
+    ] },
+    options: { scales: { y: { beginAtZero: true, title: { display: true, text: "kWh" } } } },
+  });
+  new Chart(document.getElementById("cost-chart"), {
+    type: "bar",
+    data: { labels, datasets: [
+      { label: "Energy (₹)", data: daily.map((d) => d.energy_cost), backgroundColor: "#ffc107" },
+      { label: "Maintenance (₹)", data: daily.map((d) => d.maintenance_cost), backgroundColor: "#dc3545" },
+    ] },
+    options: { scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, title: { display: true, text: "₹" } } } },
+  });
+})();
+</script>
+{% endblock %}

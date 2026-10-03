@@ -1,6 +1,6 @@
 """User management for administrators: list users, change roles, (de)activate accounts."""
 
-from flask import abort, current_app, flash, redirect, render_template, url_for
+from flask import abort, current_app, flash, redirect, render_template, request, url_for
 from flask_login import current_user
 from flask_wtf import FlaskForm
 from wtforms import SelectField
@@ -9,6 +9,7 @@ from app.admin import bp
 from app.auth.decorators import role_required
 from app.extensions import db
 from app.models import Role, User
+from app.services.settings import SETTINGS, all_settings, reset_setting, set_setting
 
 
 class RoleForm(FlaskForm):
@@ -26,6 +27,54 @@ def _get_other_user(user_id: int) -> User:
         flash("You can't change your own role or status.", "warning")
         abort(redirect(url_for("admin.users")))
     return user
+
+
+@bp.route("/settings", methods=["GET", "POST"])
+@role_required(Role.ADMIN)
+def settings():
+    """Edit system settings (tariff, speed limit, ...); blank or 'reset' restores the default."""
+    errors: dict[str, str] = {}
+    if request.method == "POST" and ActionForm().validate_on_submit():
+        if "reset" in request.form:
+            for key in SETTINGS:
+                reset_setting(key)
+            db.session.commit()
+            flash("All settings restored to their defaults.", "success")
+            return redirect(url_for("admin.settings"))
+        changes = {}
+        for key, definition in SETTINGS.items():
+            raw = request.form.get(key, "").strip()
+            if not raw:
+                errors[key] = f"{definition.label} is required."
+                continue
+            try:
+                value = float(raw)
+            except ValueError:
+                errors[key] = "Enter a number."
+                continue
+            try:
+                set_setting(key, value, current_user.id)  # validates the allowed range
+                changes[key] = value
+            except ValueError as err:
+                errors[key] = str(err)
+        if errors:
+            db.session.rollback()
+        else:
+            db.session.commit()
+            current_app.logger.info("%s updated settings: %s", current_user.email, changes)
+            flash("Settings saved.", "success")
+            return redirect(url_for("admin.settings"))
+
+    values = all_settings()
+    defaults = {key: current_app.config[d.config_key] for key, d in SETTINGS.items()}
+    return render_template(
+        "admin/settings.html",
+        definitions=SETTINGS,
+        values={k: request.form.get(k, values[k]) for k in SETTINGS} if errors else values,
+        defaults=defaults,
+        errors=errors,
+        form=ActionForm(),
+    )
 
 
 @bp.route("/users")

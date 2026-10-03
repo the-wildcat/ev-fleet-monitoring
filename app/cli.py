@@ -85,6 +85,18 @@ def register_cli(app: Flask) -> None:
 
         click.echo(f"Checked {run_maintenance_checks()} vehicles.")
 
+    @app.cli.command("rollup-energy")
+    @click.option("--days", default=7, show_default=True, help="How many past days to rebuild.")
+    def rollup_energy(days: int) -> None:
+        """Rebuild the daily energy/cost table from telemetry (e.g. after an import)."""
+        from datetime import timedelta
+
+        from app.services.energy import local_today, rollup
+
+        today = local_today()
+        written = rollup(today - timedelta(days=days - 1), today)
+        click.echo(f"Updated {written} vehicle-days.")
+
     @app.cli.command("send-alert-emails")
     def send_alert_emails() -> None:
         """Email managers about open critical alerts not yet notified."""

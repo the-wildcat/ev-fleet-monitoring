@@ -22,7 +22,7 @@
     ("battery.overview", "battery-half", "Battery Health"),
     ("drivers.leaderboard", "person-badge", "Driver Behaviour"),
     ("alerts.inbox", "bell", "Alerts"),
-    (None, "lightning-charge", "Energy & Cost"),
+    ("analytics.energy", "lightning-charge", "Energy & Cost"),
     (None, "file-earmark-bar-graph", "Reports"),
   ] %}
 
@@ -56,6 +56,11 @@
             <li class="nav-item">
               <a class="nav-link {{ 'active' if request.endpoint == 'admin.users' }}" href="{{ url_for('admin.users') }}">
                 <i class="bi bi-people"></i> Users
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link {{ 'active' if request.endpoint == 'admin.settings' }}" href="{{ url_for('admin.settings') }}">
+                <i class="bi bi-sliders"></i> Settings
               </a>
             </li>
           {% endif %}

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-1">Settings</h1>
+<p class="text-muted mb-4">System-wide values used by the energy, cost and driver analyses. Changes apply immediately;
+  past days keep the tariff that applied at the time.</p>
+
+<form method="post" novalidate class="card shadow-sm" style="max-width: 760px">
+  {{ form.csrf_token }}
+  <div class="card-body">
+    {% for group in definitions.values()|map(attribute="group")|unique %}
+      <h2 class="h6 text-muted mt-2">{{ group }}</h2>
+      {% for key, d in definitions.items() if d.group == group %}
+        <div class="row align-items-start mb-3">
+          <label class="col-sm-5 col-form-label" for="{{ key }}">{{ d.label }}</label>
+          <div class="col-sm-7">
+            <div class="input-group">
+              <input id="{{ key }}" name="{{ key }}" type="number" step="any" min="{{ d.minimum }}" max="{{ d.maximum }}"
+                     class="form-control {{ 'is-invalid' if errors[key] }}" value="{{ values[key] }}">
+              <span class="input-group-text">{{ d.unit }}</span>
+              {% if errors[key] %}<div class="invalid-feedback">{{ errors[key] }}</div>{% endif %}
+            </div>
+            <div class="form-text">{{ d.help }} Default: {{ "%g"|format(defaults[key]) }} {{ d.unit }}.</div>
+          </div>
+        </div>
+      {% endfor %}
+    {% endfor %}
+  </div>
+  <div class="card-footer bg-white d-flex gap-2">
+    <button class="btn btn-success">Save settings</button>
+    <button class="btn btn-outline-secondary" name="reset" value="1">Restore defaults</button>
+  </div>
+</form>
+{% endblock %}

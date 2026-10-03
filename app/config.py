@@ -67,6 +67,16 @@ class Config:
     MIN_SCORING_DISTANCE_KM = 5.0  # less driving than this isn't enough to score
     ENERGY_TARIFF_INR_PER_KWH = float(os.environ.get("ENERGY_TARIFF_INR_PER_KWH", "10"))
 
+    # Energy & cost analysis (defaults; admins can change them on the Settings page)
+    CHARGING_EFFICIENCY_PCT = float(os.environ.get("CHARGING_EFFICIENCY_PCT", "90"))
+    PETROL_PRICE_INR_PER_L = float(os.environ.get("PETROL_PRICE_INR_PER_L", "105"))
+    ICE_KM_PER_L = float(os.environ.get("ICE_KM_PER_L", "15"))
+    # Emission factors (kg CO2): Indian grid average per kWh (Central Electricity Authority,
+    # CO2 Baseline Database, ~0.72 t/MWh) and petrol combustion per litre (~2.31 kg).
+    GRID_EMISSION_KG_PER_KWH = 0.72
+    PETROL_EMISSION_KG_PER_L = 2.31
+    ENERGY_ROLLUP_MINUTES = 60  # how often the background job refreshes daily energy rows
+
     # Background jobs: maintenance rules and alert emails (run inside the web process)
     BACKGROUND_JOBS_ENABLED = os.environ.get("BACKGROUND_JOBS_ENABLED", "true").lower() == "true"
 

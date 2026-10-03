@@ -55,7 +55,7 @@
               <i class="bi bi-lightbulb"></i> <strong>Coaching tip:</strong>
               {% if top[0] == "Harsh braking" %}Keep a longer following distance and anticipate stops; regenerative braking recovers more energy when you slow down gradually.
               {% elif top[0] == "Harsh acceleration" %}Accelerate smoothly; hard launches draw high power from the battery and raise its temperature.
-              {% else %}Keep to {{ cfg.SPEED_LIMIT_KMH|int }} km/h; energy use rises sharply with speed because of air resistance.{% endif %}
+              {% else %}Keep to {{ settings.speed_limit_kmh|int }} km/h; energy use rises sharply with speed because of air resistance.{% endif %}
             </div>
           {% endif %}
         </div>

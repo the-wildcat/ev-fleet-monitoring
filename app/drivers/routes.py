@@ -14,6 +14,7 @@ from app.services.driving import (
     period_bounds,
     recent_events,
 )
+from app.services.settings import all_settings
 
 PERIODS = {1: "Today", 7: "Last 7 days", 30: "Last 30 days"}
 
@@ -71,6 +72,7 @@ def leaderboard():
         good=GOOD_SCORE,
         fair=FAIR_SCORE,
         cfg=current_app.config,
+        settings=all_settings(),
     )
 
 
@@ -92,4 +94,5 @@ def scorecard(driver_id: int):
         days=days,
         periods=PERIODS,
         cfg=current_app.config,
+        settings=all_settings(),
     )
