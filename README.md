@@ -3,10 +3,10 @@
 Real-Time EV Fleet Monitoring and Predictive Analytics Solution, an Infosys Springboard
 internship project being rebuilt module by module to production standards.
 
-> **Status:** Phase 0 (foundation) and Modules 1–5 (authentication and roles; EV registration
-> and real-time monitoring; route optimisation and battery health; driver behaviour and
-> maintenance alerts; energy and cost analysis) are complete. Module 6 (reports) and delivery
-> are in progress; see the roadmap below.
+> **Status:** all six modules in the project specification are complete (authentication and
+> roles; EV registration and real-time monitoring; route optimisation and battery health;
+> driver behaviour and maintenance alerts; energy and cost analysis; report generation).
+> Deployment packaging (Docker, CI, hosting) is in progress; see the roadmap below.
 
 ## Quick start (Windows / PowerShell)
 
@@ -186,6 +186,30 @@ rebuilds past days.
 comparable petrol mileage and the fleet speed limit. Defaults come from `.env`; changes apply
 immediately.
 
+## Reports
+
+`/reports` builds customisable reports: choose the report, a date range (up to a year), the
+vehicles, the columns and a title, preview it, then download it.
+
+| Report | Contents |
+|---|---|
+| Fleet summary | Per vehicle: distance, energy, kWh/100 km vs rated, energy and maintenance cost, cost/km, alerts, latest battery health |
+| Energy & cost by day | Daily rows per vehicle from the energy roll-up |
+| Driver behaviour | Score, harsh events, events per 100 km and energy impact per driver |
+| Alerts | Every alert in the period with severity, acknowledgement and outcome |
+| Service history | Maintenance work and costs |
+
+Formats:
+- **Excel (.xlsx):** styled header, filters, frozen header row, number and ₹ formats, and a summary sheet.
+- **PDF:** title, period, author, summary figures and the table; landscape for wide reports;
+  page numbers; bundled DejaVu Sans font so ₹ renders everywhere.
+- **CSV:** UTF-8 with BOM so Excel shows ₹ correctly.
+
+Reports respect the same access rules as the pages (drivers: their own vehicles and driving).
+Text cells beginning with `=`, `+`, `-` or `@` are prefixed with `'` in CSV and Excel files to
+block spreadsheet formula injection. The builder uses GET parameters, so a report's URL can be
+bookmarked and the downloads always match the preview.
+
 ## Data sources
 
 Both datasets are real and rebuilt from their official sources by scripts in `scripts/`.
@@ -195,6 +219,9 @@ Downloads go to `data/raw/`, which git ignores; the cleaned outputs in `data/` a
 |---|---|---|---|
 | `data/charging_stations_india.csv` | **Bureau of Energy Efficiency (Ministry of Power, Govt. of India)**, *EV Public Charging Stations Data till 26 October 2025*, [beeindia.gov.in](https://www.beeindia.gov.in/WriteReadData/RTF1984/EV_PCS_Data_29277.pdf) | Route planner | `python -m scripts.build_charging_stations` |
 | `data/battery_cycles_nasa.csv` | **NASA Ames Prognostics Center of Excellence**, *Li-ion Battery Aging Data Set*, B. Saha & K. Goebel (2007), [NASA PCoE data repository](https://www.nasa.gov/intelligent-systems-division/discovery-and-systems-health/pcoe/pcoe-data-set-repository/) | Battery health model | `python -m scripts.build_battery_dataset`, then `python -m ml.train_battery_model` |
+
+The PDF font (DejaVu Sans, `app/static/fonts/`) is redistributed under its free licence,
+included alongside it.
 
 Each script prints a cleaning report: duplicates, invalid coordinates or measurements, and
 normalised connector types. The original submission's datasets (a synthetic battery sheet and an
@@ -216,9 +243,11 @@ app/            Flask application (app factory, blueprints, templates, static fi
   drivers/      driver behaviour leaderboard and scorecards
   alerts/       alerts inbox (acknowledge, resolve, history)
   analytics/    energy and cost analysis
+  reports/      report builder and downloads
   api/          versioned JSON API (/api/v1): telemetry ingest, battery prediction
   services/     email, telemetry, simulator, alerts, routing, battery model, driving,
-                maintenance rules, notifications, background jobs, energy roll-up, settings
+                maintenance rules, notifications, background jobs, energy roll-up, settings,
+                report definitions and exporters (CSV/Excel/PDF)
   main/         overview dashboard and /healthz endpoint
   cli.py        create-admin, set-role, send-test-email, seed-vehicles, simulate,
                 prune-telemetry, check-maintenance, send-alert-emails, rollup-energy
@@ -242,5 +271,5 @@ wsgi.py         entry point for `flask run` and gunicorn
 | 3 | Route optimisation and battery health (ML) | Done |
 | 4 | Driver behaviour and maintenance alerts | Done |
 | 5 | Energy and cost analysis | Done |
-| 6 | Report generation | Planned |
+| 6 | Report generation | Done |
 | 7 | Admin, Docker, CI, deployment | Planned |

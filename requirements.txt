@@ -13,5 +13,8 @@ pandas==3.0.6
 scikit-learn==1.9.1
 joblib==1.6.0
 requests==2.34.2
+# Report exports: Excel and PDF
+openpyxl==3.1.5
+reportlab==5.0.1
 # Time zone database (Windows has none built in; used to show times in IST)
 tzdata==2026.5

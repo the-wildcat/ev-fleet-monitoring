@@ -51,6 +51,7 @@ def create_app(config_name: str | None = None) -> Flask:
     from app.errors import register_error_handlers
     from app.main import bp as main_bp
     from app.monitoring import bp as monitoring_bp
+    from app.reports import bp as reports_bp
     from app.routing import bp as routing_bp
     from app.services.battery_model import BatteryModel
     from app.vehicles import bp as vehicles_bp
@@ -66,6 +67,7 @@ def create_app(config_name: str | None = None) -> Flask:
         drivers_bp,
         alerts_bp,
         analytics_bp,
+        reports_bp,
         api_bp,
     ):
         app.register_blueprint(blueprint)

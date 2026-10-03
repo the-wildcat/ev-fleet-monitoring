@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}Reports{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-1">Reports</h1>
+<p class="text-muted mb-4">Build a report, preview it, then download it as Excel, PDF or CSV.</p>
+
+<div class="row g-4">
+  <div class="col-xl-4">
+    <form method="get" class="card shadow-sm" id="report-form">
+      <div class="card-body">
+        {% for error in req.errors %}<div class="alert alert-warning py-2 small">{{ error }}</div>{% endfor %}
+
+        <label class="form-label fw-semibold" for="type">Report</label>
+        <select id="type" name="type" class="form-select mb-1">
+          {% for key, r in reports.items() %}
+            <option value="{{ key }}" {{ "selected" if key == req.report.key }}>{{ r.title }}</option>
+          {% endfor %}
+        </select>
+        <div class="form-text mb-3" id="type-help">{{ req.report.description }}</div>
+
+        <label class="form-label" for="title">Title</label>
+        <input id="title" name="title" class="form-control mb-3" maxlength="120" value="{{ req.title if req.title != req.report.title }}" placeholder="{{ req.report.title }}">
+
+        <div class="row g-2 mb-3">
+          <div class="col-6"><label class="form-label" for="start">From</label>
+            <input id="start" name="start" type="date" class="form-control" value="{{ req.first.isoformat() }}"></div>
+          <div class="col-6"><label class="form-label" for="end">To</label>
+            <input id="end" name="end" type="date" class="form-control" value="{{ req.last.isoformat() }}"></div>
+        </div>
+        <div class="d-flex flex-wrap gap-1 mb-3 small">
+          {% for label, days in [("7 days", 7), ("30 days", 30), ("90 days", 90), ("1 year", 365)] %}
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-days="{{ days }}">{{ label }}</button>
+          {% endfor %}
+        </div>
+
+        <fieldset class="mb-3" {{ "disabled" if not req.report.uses_vehicle_filter }}>
+          <legend class="form-label fs-6">Vehicles <span class="text-muted small">(none ticked = all)</span></legend>
+          <div class="border rounded p-2" style="max-height: 160px; overflow-y: auto">
+            {% for v in all_vehicles %}
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="vehicle" value="{{ v.id }}" id="v{{ v.id }}" {{ "checked" if v.id in selected_ids }}>
+                <label class="form-check-label small" for="v{{ v.id }}">{{ v.plate_number }} <span class="text-muted">{{ v.display_name }}</span></label>
+              </div>
+            {% else %}
+              <div class="small text-muted">No vehicles.</div>
+            {% endfor %}
+          </div>
+          {% if not req.report.uses_vehicle_filter %}<div class="form-text">Not used for this report.</div>{% endif %}
+        </fieldset>
+
+        <fieldset class="mb-3">
+          <legend class="form-label fs-6">Columns</legend>
+          {% set chosen = req.columns|map(attribute="key")|list %}
+          <div class="row">
+            {% for c in req.report.columns %}
+              <div class="col-6"><div class="form-check">
+                <input class="form-check-input" type="checkbox" name="col" value="{{ c.key }}" id="c-{{ c.key }}" {{ "checked" if c.key in chosen }}>
+                <label class="form-check-label small" for="c-{{ c.key }}">{{ c.label }}</label>
+              </div></div>
+            {% endfor %}
+          </div>
+        </fieldset>
+
+        <button class="btn btn-success w-100"><i class="bi bi-eye"></i> Preview report</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="col-xl-8">
+    {% if data is none %}
+      <div class="card shadow-sm h-100"><div class="card-body text-muted d-flex align-items-center justify-content-center" style="min-height: 320px">
+        <div class="text-center"><i class="bi bi-file-earmark-bar-graph fs-1"></i><p class="mt-2 mb-0">Choose a report and press Preview.</p></div>
+      </div></div>
+    {% else %}
+      <div class="card shadow-sm">
+        <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+          <div>
+            <div class="fw-semibold">{{ req.title }}</div>
+            <div class="small text-muted">{{ req.period }} · {{ data.rows|length }} row{{ "s" if data.rows|length != 1 }}</div>
+          </div>
+          <div class="btn-group" role="group" aria-label="Download">
+            {% set qs = request.query_string.decode() %}
+            <a class="btn btn-sm btn-success" href="{{ url_for('reports.download', fmt='xlsx') }}?{{ qs }}"><i class="bi bi-file-earmark-excel"></i> Excel</a>
+            <a class="btn btn-sm btn-outline-success" href="{{ url_for('reports.download', fmt='pdf') }}?{{ qs }}"><i class="bi bi-file-earmark-pdf"></i> PDF</a>
+            <a class="btn btn-sm btn-outline-success" href="{{ url_for('reports.download', fmt='csv') }}?{{ qs }}"><i class="bi bi-filetype-csv"></i> CSV</a>
+          </div>
+        </div>
+        {% if data.summary %}
+          <div class="card-body border-bottom">
+            <div class="d-flex flex-wrap gap-4">
+              {% for label, value in data.summary %}
+                <div><div class="small text-muted">{{ label }}</div><div class="fw-semibold">{{ value }}</div></div>
+              {% endfor %}
+            </div>
+            {% if data.note %}<div class="small text-muted mt-2">{{ data.note }}</div>{% endif %}
+          </div>
+        {% endif %}
+        {% if preview %}
+          <div class="table-responsive" style="max-height: 60vh">
+            <table class="table table-sm table-striped align-middle mb-0">
+              <thead class="table-light sticky-top"><tr>{% for c in req.columns %}<th class="small">{{ c.label }}</th>{% endfor %}</tr></thead>
+              <tbody>
+                {% for row in preview %}
+                  <tr>{% for value in row %}<td class="small">{{ value }}</td>{% endfor %}</tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% if data.rows|length > preview_rows %}
+            <div class="card-footer bg-white small text-muted">Showing the first {{ preview_rows }} of {{ data.rows|length }} rows. Downloads include all rows.</div>
+          {% endif %}
+        {% else %}
+          <div class="card-body text-muted">No data for this period and selection.</div>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+  const form = document.getElementById("report-form");
+  // Quick date ranges.
+  form.querySelectorAll("[data-days]").forEach((btn) => btn.addEventListener("click", () => {
+    const end = new Date();
+    const start = new Date(end);
+    start.setDate(end.getDate() - Number(btn.dataset.days) + 1);
+    const iso = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    form.start.value = iso(start);
+    form.end.value = iso(end);
+  }));
+  // Switching report type resets the column choice to that report's columns.
+  form.type.addEventListener("change", () => {
+    form.querySelectorAll('input[name="col"]').forEach((el) => el.remove());
+    form.submit();
+  });
+})();
+</script>
+{% endblock %}

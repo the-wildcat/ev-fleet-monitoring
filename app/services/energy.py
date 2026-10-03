@@ -46,7 +46,7 @@ def local_today() -> date:
     return datetime.now(_tz()).date()
 
 
-def _utc_bounds(first: date, last: date) -> tuple[datetime, datetime]:
+def utc_bounds(first: date, last: date) -> tuple[datetime, datetime]:
     """Naive-UTC [start of `first`, start of the day after `last`) in local time."""
     tz = _tz()
     start = datetime.combine(first, time.min, tz).astimezone(UTC).replace(tzinfo=None)
@@ -56,7 +56,7 @@ def _utc_bounds(first: date, last: date) -> tuple[datetime, datetime]:
 
 def rollup(first: date, last: date) -> int:
     """(Re)compute DailyEnergy rows for local days first..last. Returns rows written."""
-    start, end = _utc_bounds(first, last)
+    start, end = utc_bounds(first, last)
     # Include the last reading before the window so the first reading has a predecessor.
     rows = db.session.execute(
         db.select(
