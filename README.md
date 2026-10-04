@@ -1,5 +1,9 @@
 # EV Fleet Monitoring
 
+[![CI](https://github.com/the-wildcat/ev-fleet-monitoring/actions/workflows/ci.yml/badge.svg)](https://github.com/the-wildcat/ev-fleet-monitoring/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.13-blue)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 Real-time monitoring and predictive analytics for electric vehicle fleets: live vehicle
 tracking, battery health prediction, charging-aware route planning, driver behaviour scoring,
 maintenance alerts, energy and cost analysis, and exportable reports.
