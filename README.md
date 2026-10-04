@@ -57,11 +57,12 @@ battery charge (SoC), charging state, battery temperature and odometer. That dat
 
 | Source | When to use | How |
 |---|---|---|
-| Built-in simulator | No real devices (default) | Runs inside the web server. Vehicles marked "simulate" drive loops through Delhi, Bengaluru, Mumbai, Kolkata or Hyderabad, drain and recharge their batteries, and each has its own driving style. |
+| Built-in simulator | No real devices (default) | Runs inside the web server. Vehicles marked "simulate" drive real road loops (OSRM geometry in `data/sim_routes.json`, rebuilt by `python -m scripts.build_sim_routes`) through Delhi, Bengaluru, Mumbai, Kolkata or Hyderabad, drain and recharge their batteries, and each has its own driving style. |
 | Device API | Real telematics devices | `POST /api/v1/telemetry` with the vehicle's API key (shown once when the vehicle is registered). |
 
 Simulator settings in `.env`: `SIMULATOR_ENABLED`, `SIMULATOR_INTERVAL_SECONDS` (default 5),
-`SIMULATOR_TIME_SCALE` (default 12, so each 5 s tick simulates 1 minute of driving). To run it as
+`SIMULATOR_TIME_SCALE` (default 3, near real time; use 12 for a fast demo where batteries
+drain visibly). Event rates are scaled to the tick length, so driver scores don't depend on it. To run it as
 a separate process instead, set `SIMULATOR_ENABLED=false` and run `flask simulate`.
 
 ### Telemetry API

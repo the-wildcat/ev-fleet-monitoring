@@ -49,8 +49,9 @@ class Config:
     # Built-in telemetry simulator (stands in for real vehicle devices)
     SIMULATOR_ENABLED = os.environ.get("SIMULATOR_ENABLED", "true").lower() == "true"
     SIMULATOR_INTERVAL_SECONDS = float(os.environ.get("SIMULATOR_INTERVAL_SECONDS", "5"))
-    # Each real interval simulates this many times as much driving (12 -> 5 s becomes 1 min).
-    SIMULATOR_TIME_SCALE = float(os.environ.get("SIMULATOR_TIME_SCALE", "12"))
+    # Each real interval simulates this many times as much driving. 3 = near real time (a 5 s
+    # tick moves a vehicle ~100-200 m along the road); 12 = quick demos (batteries drain fast).
+    SIMULATOR_TIME_SCALE = float(os.environ.get("SIMULATOR_TIME_SCALE", "3"))
 
     # Alert thresholds
     ALERT_LOW_SOC_PCT = 20.0

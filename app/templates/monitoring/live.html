@@ -66,6 +66,27 @@
 
   const markers = new Map();
   let fittedOnce = false;
+  const REFRESH_MS = 5000;
+
+  // Move a marker smoothly to its new position over (almost) one refresh interval, the way
+  // fleet maps animate between GPS fixes. Big jumps (first load, a vehicle coming back
+  // online far away) and hidden tabs move instantly.
+  function glide(marker, to) {
+    const from = marker.getLatLng();
+    if (marker._glide) cancelAnimationFrame(marker._glide);
+    if (document.hidden || from.distanceTo(to) > 2000 || from.equals(to)) {
+      marker.setLatLng(to);
+      return;
+    }
+    const start = performance.now();
+    const duration = REFRESH_MS * 0.9;
+    const step = (now) => {
+      const t = Math.min(1, (now - start) / duration);
+      marker.setLatLng([from.lat + (to.lat - from.lat) * t, from.lng + (to.lng - from.lng) * t]);
+      if (t < 1) marker._glide = requestAnimationFrame(step);
+    };
+    marker._glide = requestAnimationFrame(step);
+  }
 
   function popupHtml(v) {
     const style = STATE_STYLES[v.state] || STATE_STYLES.no_data;
@@ -98,7 +119,8 @@
         marker = L.circleMarker([v.lat, v.lon], options).addTo(map).bindPopup("");
         markers.set(v.id, marker);
       }
-      marker.setLatLng([v.lat, v.lon]).setStyle(options);
+      glide(marker, L.latLng(v.lat, v.lon));
+      marker.setStyle(options);
       marker.setPopupContent(popupHtml(v));
       marker.bindTooltip(v.plate, { direction: "top", offset: [0, -8] });
     }
@@ -140,7 +162,7 @@
     }
   }
   refresh();
-  setInterval(refresh, 5000);
+  setInterval(refresh, REFRESH_MS);
 })();
 </script>
 {% endblock %}

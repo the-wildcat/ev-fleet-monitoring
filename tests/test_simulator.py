@@ -1,6 +1,8 @@
 import random
 from datetime import timedelta
 
+import pytest
+
 from app.extensions import db
 from app.models import Telemetry, VehicleStatus
 from app.services.simulator import (
@@ -98,13 +100,38 @@ def test_fleet_step_records_only_active_simulated_vehicles(app, make_vehicle):
 
 def test_simulator_resumes_from_last_known_position_and_charge(make_vehicle):
     vehicle, _ = make_vehicle()
-    points = new_sim_for(vehicle, random.Random(0)).points  # this vehicle's city loop
-    last = points[3]
-    vehicle.last_lat, vehicle.last_lon, vehicle.last_soc_pct = last[0] + 0.001, last[1], 55.0
+    points = new_sim_for(vehicle, random.Random(0)).points  # this vehicle's city road loop
+    last = points[len(points) // 2]
+    vehicle.last_lat, vehicle.last_lon, vehicle.last_soc_pct = last[0], last[1], 55.0
 
     state = new_sim_for(vehicle, random.Random(0))
-    assert state.segment == 3  # nearest waypoint to where it was last seen
+    # Resumes on the road right where it was last seen, not back at the start of the loop.
+    assert haversine_km(state.points[state.segment], last) < 0.05
+    assert state.segment > 0
     assert state.soc_pct == 55.0
+
+
+def test_simulator_follows_real_roads(app, make_vehicle):
+    from app.services.simulator import loop_for_city
+
+    for city, waypoints in CITY_LOOPS.items():
+        road = loop_for_city(city)
+        assert len(road) > 10 * len(waypoints)  # dense road geometry, not straight lines
+        # consecutive road points are close together (no long straight "teleport" segments)
+        gaps = [haversine_km(a, b) for a, b in zip(road, road[1:], strict=False)]
+        assert max(gaps) < 2.0
+
+
+def test_event_rate_is_independent_of_tick_length(make_vehicle):
+    vehicle, _ = make_vehicle(battery_capacity_kwh=5000)
+
+    def harsh_per_100km(dt):
+        sim = _sim(vehicle, soc=100, aggr=1.5, seed=11)
+        readings = [sim.tick(dt, vehicle) for _ in range(int(3000 * 60 / dt))]
+        events = sum(abs(r["acceleration_mps2"]) >= 3.0 for r in readings)
+        return events / sim.odometer_km * 100
+
+    assert harsh_per_100km(15) == pytest.approx(harsh_per_100km(60), rel=0.3)
 
 
 def test_prune_old_telemetry(app, make_vehicle):

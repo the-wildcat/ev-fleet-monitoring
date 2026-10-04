@@ -16,20 +16,24 @@ demo shows visible movement and battery changes within minutes.
 
 from __future__ import annotations
 
+import json
 import math
 import random
 import threading
 import time
 from dataclasses import dataclass, field
+from functools import lru_cache
+from pathlib import Path
 
-from flask import Flask
+from flask import Flask, current_app
 
 from app.extensions import db
 from app.models import Vehicle, VehicleStatus
 from app.services.telemetry import parse_reading, prune_old_telemetry, record_reading
 from app.utils import utcnow
 
-# Waypoint loops through real city locations (lat, lon). Vehicles drive them in order.
+# Landmark waypoints per city (lat, lon). scripts/build_sim_routes.py turns each list into a
+# closed loop of real road geometry (data/sim_routes.json), which vehicles then follow.
 CITY_LOOPS: dict[str, list[tuple[float, float]]] = {
     "Delhi": [
         (28.6315, 77.2167),  # Connaught Place
@@ -152,14 +156,17 @@ class VehicleSim:
             old_speed = self.speed_kmh
             # Style affects risky events more than proportionally (calm 0.46x, aggressive 2.4x).
             events = aggr**1.5
-            speeding = rng.random() < 0.02 * events  # e.g. on an arterial road
+            # Probabilities are calibrated per simulated minute, then scaled to the tick length
+            # so events per 100 km stay the same at any simulation speed.
+            per_tick = min(1.0, dt_s / 60)
+            speeding = rng.random() < 0.02 * events * per_tick  # e.g. on an arterial road
             new_speed = rng.uniform(75, 95) if speeding else rng.uniform(15, 60)
             # Peak acceleration within the interval; aggressive drivers have more harsh events.
             roll = rng.random()
-            if roll < 0.012 * events:
+            if roll < 0.012 * events * per_tick:
                 accel = -rng.uniform(3.5, 6.5)  # harsh braking
                 new_speed = rng.uniform(5, 25)
-            elif roll < 0.022 * events:
+            elif roll < 0.022 * events * per_tick:
                 accel = rng.uniform(2.8, 4.5)  # harsh acceleration
             else:
                 accel = rng.gauss(0, 0.5) + (new_speed - old_speed) / 3.6 / 10
@@ -208,9 +215,24 @@ def aggressiveness_for(vehicle_id: int) -> float:
     return round(random.Random(vehicle_id * 7919).uniform(0.6, 1.8), 2)
 
 
+@lru_cache(maxsize=2)
+def _road_loops(path: Path) -> dict[str, list[tuple[float, float]]]:
+    """Real road geometry per city (built by scripts/build_sim_routes.py), if available."""
+    if not path.exists():
+        return {}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return {city: [tuple(p) for p in points] for city, points in data.items()}
+
+
+def loop_for_city(city: str) -> list[tuple[float, float]]:
+    """The city's road loop, or its landmark waypoints if the road file is missing."""
+    roads = _road_loops(Path(current_app.config["DATA_DIR"]) / "sim_routes.json")
+    return roads.get(city) or CITY_LOOPS[city]
+
+
 def new_sim_for(vehicle: Vehicle, rng: random.Random) -> VehicleSim:
     cities = list(CITY_LOOPS)
-    points = CITY_LOOPS[cities[vehicle.id % len(cities)]]
+    points = loop_for_city(cities[vehicle.id % len(cities)])
     segment = 0
     if vehicle.last_lat is not None and vehicle.last_lon is not None:
         # Resume near where the vehicle was last seen (e.g. after an app restart).
