@@ -29,11 +29,11 @@
 <div class="row g-4">
   <div class="col-xl-8">
     <div class="card shadow-sm">
-      <div class="card-header bg-white fw-semibold">Leaderboard</div>
+      <div class="card-header fw-semibold">Leaderboard</div>
       {% if stats %}
         <div class="table-responsive">
           <table class="table table-hover align-middle mb-0">
-            <thead class="table-light">
+            <thead>
               <tr>
                 <th>#</th><th>Driver</th><th class="text-end">Distance</th>
                 <th class="text-end" title="Harsh braking per 100 km">Brake</th>
@@ -66,21 +66,21 @@
         <div class="card-body text-muted">No driving recorded for assigned drivers in this period. Assign drivers to vehicles to start scoring.</div>
       {% endif %}
       {% if idle %}
-        <div class="card-footer bg-white small text-muted">No driving this period: {{ idle|map(attribute="name")|join(", ") }}</div>
+        <div class="card-footer small text-muted">No driving this period: {{ idle|map(attribute="name")|join(", ") }}</div>
       {% endif %}
     </div>
   </div>
 
   <div class="col-xl-4">
     <div class="card shadow-sm mb-4">
-      <div class="card-header bg-white fw-semibold">Safety vs energy</div>
+      <div class="card-header fw-semibold">Safety vs energy</div>
       <div class="card-body">
         <canvas id="scatter" height="260" aria-label="Driver score against energy use"></canvas>
         <p class="small text-muted mb-0 mt-2">Each dot is a driver. Lower scores (more harsh events) tend to use more energy than the vehicle's rating.</p>
       </div>
     </div>
     <div class="card shadow-sm">
-      <div class="card-header bg-white fw-semibold">How scores work</div>
+      <div class="card-header fw-semibold">How scores work</div>
       <div class="card-body small">
         <p class="mb-2">Score = 100 − (4 × harsh braking + 3 × harsh acceleration + 2 × speeding), each counted <strong>per 100 km</strong>.</p>
         <ul class="mb-2">

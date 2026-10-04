@@ -39,7 +39,7 @@
   <div class="row g-4 mb-4">
     <div class="col-lg-4">
       <div class="card shadow-sm h-100">
-        <div class="card-header bg-white fw-semibold">Event breakdown</div>
+        <div class="card-header fw-semibold">Event breakdown</div>
         <div class="card-body">
           {% set rows = [("Harsh braking", st.harsh_brake, "danger"), ("Harsh acceleration", st.harsh_accel, "warning"), ("Speeding", st.speeding, "info")] %}
           {% set biggest = [1] + rows|map(attribute=1)|list %}
@@ -63,7 +63,7 @@
     </div>
     <div class="col-lg-8">
       <div class="card shadow-sm h-100">
-        <div class="card-header bg-white fw-semibold">Daily trend</div>
+        <div class="card-header fw-semibold">Daily trend</div>
         <div class="card-body"><canvas id="trend" height="120" aria-label="Daily score and distance"></canvas></div>
       </div>
     </div>
@@ -71,11 +71,11 @@
 {% endif %}
 
 <div class="card shadow-sm">
-  <div class="card-header bg-white fw-semibold">Recent events</div>
+  <div class="card-header fw-semibold">Recent events</div>
   {% if events %}
     <div class="table-responsive">
       <table class="table table-sm align-middle mb-0">
-        <thead class="table-light"><tr><th>When</th><th>Event</th><th>Detail</th><th>Vehicle</th><th>Where</th></tr></thead>
+        <thead><tr><th>When</th><th>Event</th><th>Detail</th><th>Vehicle</th><th>Where</th></tr></thead>
         <tbody>
           {% for e in events %}
             <tr>

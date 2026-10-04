@@ -18,7 +18,7 @@
     </div>
 
     <p class="mb-1">The vehicle's telematics device sends readings like this:</p>
-    <pre class="bg-light p-3 rounded small mb-3"><code>curl -X POST {{ url_for('api.ingest_telemetry', _external=True) }} \
+    <pre class="p-3 rounded small mb-3"><code>curl -X POST {{ url_for('api.ingest_telemetry', _external=True) }} \
   -H "X-API-Key: {{ api_key }}" \
   -H "Content-Type: application/json" \
   -d '{"lat": 28.6139, "lon": 77.2090, "speed_kmh": 42.5, "soc_pct": 76.2,

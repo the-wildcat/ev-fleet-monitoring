@@ -54,13 +54,13 @@
 <div class="row g-3 mb-4">
   <div class="col-lg-5">
     <div class="card shadow-sm h-100">
-      <div class="card-header bg-white fw-semibold">Last hour: route</div>
+      <div class="card-header fw-semibold">Last hour: route</div>
       <div id="track-map" style="height: 320px" aria-label="Map of the vehicle's recent route"></div>
     </div>
   </div>
   <div class="col-lg-7">
     <div class="card shadow-sm h-100">
-      <div class="card-header bg-white fw-semibold">Last hour: speed and battery</div>
+      <div class="card-header fw-semibold">Last hour: speed and battery</div>
       <div class="card-body"><canvas id="history-chart" height="140" aria-label="Speed and battery chart"></canvas></div>
     </div>
   </div>
@@ -69,11 +69,11 @@
 <div class="row g-3">
   <div class="col-lg-8">
     <div class="card shadow-sm" id="service">
-      <div class="card-header bg-white fw-semibold">Service history</div>
+      <div class="card-header fw-semibold">Service history</div>
       {% if vehicle.service_records %}
         <div class="table-responsive">
           <table class="table align-middle mb-0">
-            <thead class="table-light"><tr><th>Date</th><th>Type</th><th>Odometer</th><th>Cost</th><th>Work done</th>{% if current_user.is_manager %}<th></th>{% endif %}</tr></thead>
+            <thead><tr><th>Date</th><th>Type</th><th>Odometer</th><th>Cost</th><th>Work done</th>{% if current_user.is_manager %}<th></th>{% endif %}</tr></thead>
             <tbody>
               {% for r in vehicle.service_records %}
                 <tr>
@@ -122,7 +122,7 @@
 
   <div class="col-lg-4">
     <div class="card shadow-sm mb-3">
-      <div class="card-header bg-white fw-semibold d-flex justify-content-between">
+      <div class="card-header fw-semibold d-flex justify-content-between">
         <span>Battery health history</span>
         <a class="small" href="{{ url_for('battery.overview') }}">Run a check</a>
       </div>
@@ -140,7 +140,7 @@
     </div>
 
     <div class="card shadow-sm mb-3">
-      <div class="card-header bg-white fw-semibold">Specifications</div>
+      <div class="card-header fw-semibold">Specifications</div>
       <div class="card-body">
         <dl class="row mb-0 small">
           <dt class="col-6">Battery</dt><dd class="col-6">{{ vehicle.battery_capacity_kwh }} kWh</dd>
@@ -155,7 +155,7 @@
 
     {% if current_user.is_manager %}
       <div class="card shadow-sm border-danger-subtle">
-        <div class="card-header bg-white fw-semibold">Device &amp; danger zone</div>
+        <div class="card-header fw-semibold">Device &amp; danger zone</div>
         <div class="card-body">
           <p class="small mb-2">API key: <code>{{ vehicle.api_key_prefix or "none" }}…</code></p>
           <form method="post" action="{{ url_for('vehicles.regenerate_api_key', vehicle_id=vehicle.id) }}" class="mb-3">
@@ -187,9 +187,7 @@
   const fmtTime = (iso) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
   const map = L.map("track-map").setView([{{ vehicle.last_lat or 22.5 }}, {{ vehicle.last_lon or 79 }}], {{ 13 if vehicle.last_lat else 4 }});
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19, attribution: "&copy; OpenStreetMap contributors",
-  }).addTo(map);
+  EV.tileLayer(map);
   const track = L.polyline([], { color: "#2e7d32", weight: 4 }).addTo(map);
   const marker = L.circleMarker([0, 0], { radius: 8, color: "#1b5e20", fillOpacity: 0.9 });
 

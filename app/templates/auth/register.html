@@ -3,7 +3,7 @@
 {% block title %}Sign up{% endblock %}
 
 {% block content %}
-{% call auth_card("Create your account") %}
+{% call auth_card("Create your account", "Start monitoring your electric fleet.") %}
   <form method="post" novalidate>
     {{ form.hidden_tag() }}
     {{ field(form.name, autofocus=true) }}

@@ -27,7 +27,7 @@
   </div>
   <div class="col-lg-3">
     <div class="card shadow-sm">
-      <div class="card-header bg-white fw-semibold">Vehicles</div>
+      <div class="card-header fw-semibold">Vehicles</div>
       <div class="list-group list-group-flush vehicle-list" id="vehicle-list">
         <div class="list-group-item text-muted">Loading…</div>
       </div>
@@ -56,9 +56,7 @@
   const fmt = (n, digits = 0) => (n === null || n === undefined ? "—" : Number(n).toFixed(digits));
 
   const map = L.map("fleet-map").setView([22.5, 79], 5);  // India
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19, attribution: "&copy; OpenStreetMap contributors",
-  }).addTo(map);
+  EV.tileLayer(map);
 
   document.getElementById("legend").innerHTML =
     Object.values(STATE_STYLES).map((s) => `<span class="me-3"><span class="legend-dot" style="background:${s.color}"></span>${s.label}</span>`).join("") +

@@ -44,14 +44,14 @@
 {% endif %}
 
 <div class="card shadow-sm">
-  <div class="card-header bg-white d-flex justify-content-between align-items-center">
+  <div class="card-header d-flex justify-content-between align-items-center">
     <span class="fw-semibold">Vehicles</span>
     <a href="{{ url_for('vehicles.list_vehicles') }}" class="small">View all</a>
   </div>
   {% if vehicles %}
     <div class="table-responsive">
       <table class="table table-hover align-middle mb-0">
-        <thead class="table-light"><tr><th>Vehicle</th><th>State</th><th>Battery</th><th>Speed</th><th>Range</th></tr></thead>
+        <thead><tr><th>Vehicle</th><th>State</th><th>Battery</th><th>Speed</th><th>Range</th></tr></thead>
         <tbody>
           {% for v in vehicles[:10] %}
             <tr>

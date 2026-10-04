@@ -47,7 +47,7 @@
 {# Driver score with its band colour. #}
 {% macro score_badge(score, band) %}
   {% if score is none %}
-    <span class="badge text-bg-light" title="{{ band }}">—</span>
+    <span class="badge bg-secondary-subtle text-secondary-emphasis" title="{{ band }}">—</span>
   {% else %}
     {% set colour = {"Good": "success", "Fair": "warning", "Needs coaching": "danger"}.get(band, "secondary") %}
     <span class="badge text-bg-{{ colour }} fs-6" title="{{ band }}">{{ "%.0f"|format(score) }}</span>
@@ -82,14 +82,14 @@
 {% endmacro %}
 
 {# Centered card used by all the auth pages. #}
-{% macro auth_card(title) %}
-  <div class="row justify-content-center">
-    <div class="col-sm-10 col-md-7 col-lg-5">
-      <div class="card shadow-sm">
-        <div class="card-body p-4">
-          <h1 class="h4 mb-3">{{ title }}</h1>
-          {{ caller() }}
-        </div>
+{% macro auth_card(title, subtitle=None) %}
+  <div class="auth-wrap">
+    <div class="card auth-card">
+      <div class="card-body">
+        <span class="brand-mark mb-3"><i class="bi bi-ev-front-fill"></i></span>
+        <h1 class="h4 mb-1">{{ title }}</h1>
+        {% if subtitle %}<p class="text-muted small mb-4">{{ subtitle }}</p>{% else %}<div class="mb-3"></div>{% endif %}
+        {{ caller() }}
       </div>
     </div>
   </div>

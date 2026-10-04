@@ -3,7 +3,7 @@
 {% block title %}Log in{% endblock %}
 
 {% block content %}
-{% call auth_card("Log in") %}
+{% call auth_card("Welcome back", "Log in to your EV Fleet Monitor account.") %}
   <form method="post" novalidate>
     {{ form.hidden_tag() }}
     {{ field(form.email, autofocus=true) }}

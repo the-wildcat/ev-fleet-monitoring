@@ -9,7 +9,7 @@
 <div class="row g-4">
   <div class="col-xl-8">
     <div class="card shadow-sm mb-4">
-      <div class="card-header bg-white fw-semibold d-flex justify-content-between">
+      <div class="card-header fw-semibold d-flex justify-content-between">
         <span>Active battery alerts</span>
         <span class="badge text-bg-{{ 'danger' if alerts else 'success' }}">{{ alerts|length }}</span>
       </div>
@@ -23,11 +23,11 @@
     </div>
 
     <div class="card shadow-sm">
-      <div class="card-header bg-white fw-semibold">Fleet batteries</div>
+      <div class="card-header fw-semibold">Fleet batteries</div>
       {% if vehicles %}
         <div class="table-responsive">
           <table class="table table-hover align-middle mb-0">
-            <thead class="table-light"><tr><th>Vehicle</th><th>State</th><th>Charge</th><th>Temp</th><th>Range</th><th>Health (last check)</th></tr></thead>
+            <thead><tr><th>Vehicle</th><th>State</th><th>Charge</th><th>Temp</th><th>Range</th><th>Health (last check)</th></tr></thead>
             <tbody>
               {% for v in vehicles %}
                 {% set check = latest_checks.get(v.id) %}
@@ -56,7 +56,7 @@
 
   <div class="col-xl-4">
     <div class="card shadow-sm">
-      <div class="card-header bg-white fw-semibold">Battery health check (ML)</div>
+      <div class="card-header fw-semibold">Battery health check (ML)</div>
       <div class="card-body">
         <p class="small text-muted">Enter cell readings from the battery management system or a service diagnostic. The model estimates remaining capacity without a full capacity test.</p>
         {% if prediction %}

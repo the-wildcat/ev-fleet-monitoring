@@ -1,65 +1,331 @@
+/* ==========================================================================
+   EV Fleet Monitor design system
+   Bootstrap 5.3 themed through CSS variables; light and dark via [data-bs-theme].
+   ========================================================================== */
+
+/* ---- tokens ------------------------------------------------------------- */
 :root {
-  --brand: #2e7d32;
-  --brand-light: #e8f5e9;
+  --ev-font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --ev-radius: 14px;
+  --ev-radius-sm: 10px;
+  --ev-sidebar-w: 248px;
+  --ev-sidebar-w-collapsed: 72px;
+  --ev-topbar-h: 64px;
+
+  /* Sidebar is dark navy in both themes (a common enterprise pattern). */
+  --ev-sidebar-bg: #0b1324;
+  --ev-sidebar-text: #94a3b8;
+  --ev-sidebar-text-strong: #e2e8f0;
+  --ev-sidebar-hover: rgba(148, 163, 184, 0.10);
+  --ev-sidebar-active-bg: rgba(45, 212, 191, 0.14);
+  --ev-sidebar-active: #2dd4bf;
 }
 
+[data-bs-theme="light"] {
+  --ev-brand: #0f766e;
+  --ev-brand-600: #0d9488;
+  --ev-brand-700: #115e59;
+  --ev-brand-soft: #ccfbf1;
+  --ev-brand-softer: #f0fdfa;
+  --ev-bg: #f4f6f9;
+  --ev-surface: #ffffff;
+  --ev-surface-2: #f8fafc;
+  --ev-border: #e6e9ef;
+  --ev-text: #0f172a;
+  --ev-muted: #64748b;
+  --ev-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 16px rgba(15, 23, 42, 0.06);
+
+  --bs-body-bg: var(--ev-bg);
+  --bs-body-color: var(--ev-text);
+  --bs-secondary-color: var(--ev-muted);
+  --bs-border-color: var(--ev-border);
+  --bs-tertiary-bg: var(--ev-surface-2);
+  --bs-emphasis-color: #020617;
+}
+
+[data-bs-theme="dark"] {
+  --ev-brand: #2dd4bf;
+  --ev-brand-600: #14b8a6;
+  --ev-brand-700: #5eead4;
+  --ev-brand-soft: rgba(45, 212, 191, 0.16);
+  --ev-brand-softer: rgba(45, 212, 191, 0.08);
+  --ev-bg: #0a0f1c;
+  --ev-surface: #111827;
+  --ev-surface-2: #172033;
+  --ev-border: #1f2a40;
+  --ev-text: #e2e8f0;
+  --ev-muted: #94a3b8;
+  --ev-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.25);
+
+  --bs-body-bg: var(--ev-bg);
+  --bs-body-color: var(--ev-text);
+  --bs-secondary-color: var(--ev-muted);
+  --bs-border-color: var(--ev-border);
+  --bs-tertiary-bg: var(--ev-surface-2);
+  --bs-secondary-bg: var(--ev-surface-2);
+}
+
+/* ---- base --------------------------------------------------------------- */
 body {
-  background: #f5f7f6;
+  font-family: var(--ev-font);
+  font-feature-settings: "cv11", "ss01";
+  background: var(--ev-bg);
+  -webkit-font-smoothing: antialiased;
 }
 
-.app-shell {
-  display: flex;
-  min-height: 100vh;
-}
+h1, .h1, h2, .h2, h3, .h3 { font-weight: 700; letter-spacing: -0.02em; }
+.h3 { font-size: 1.5rem; }
+.text-muted { color: var(--ev-muted) !important; }
+a { color: var(--ev-brand); text-decoration: none; }
+a:hover { color: var(--ev-brand-700); text-decoration: underline; text-underline-offset: 3px; }
+.btn:hover, .nav-link:hover, .dropdown-item:hover, .brand-link:hover { text-decoration: none; }
+::selection { background: var(--ev-brand-soft); }
+
+/* ---- app shell ---------------------------------------------------------- */
+.app-shell { display: flex; min-height: 100vh; }
 
 .sidebar {
-  width: 250px;
+  width: var(--ev-sidebar-w);
   flex-shrink: 0;
-  background: var(--brand);
+  /* !important: Bootstrap's responsive offcanvas forces a transparent background on desktop. */
+  background: var(--ev-sidebar-bg) !important;
+  color: var(--ev-sidebar-text);
+  display: flex;
+  flex-direction: column;
+  transition: width 0.2s ease;
 }
-
-.sidebar .brand {
-  color: #fff;
-  font-size: 1.25rem;
-  font-weight: 600;
+@media (min-width: 992px) {
+  .sidebar { position: sticky; top: 0; height: 100vh; }
 }
+.sidebar.offcanvas-lg { --bs-offcanvas-bg: var(--ev-sidebar-bg); --bs-offcanvas-width: 270px; }
 
-.sidebar .nav-link {
-  color: rgba(255, 255, 255, 0.9);
+.sidebar-brand {
+  height: var(--ev-topbar-h);
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: space-between;
+  padding: 0 1.1rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.10);
 }
-
-.sidebar .nav-link:hover {
-  background: rgba(255, 255, 255, 0.12);
+.brand-link { display: flex; align-items: center; gap: 0.6rem; text-decoration: none; }
+.brand-mark {
+  width: 34px; height: 34px; border-radius: 10px;
+  display: grid; place-items: center;
+  background: linear-gradient(135deg, #14b8a6, #0f766e);
+  color: #fff; font-size: 1.05rem;
+  box-shadow: 0 4px 12px rgba(20, 184, 166, 0.35);
+  flex-shrink: 0;
 }
+.brand-text { font-weight: 700; color: var(--ev-text); line-height: 1.05; letter-spacing: -0.01em; }
+.sidebar .brand-text { color: #fff; }
+.brand-sub { display: block; font-size: 0.68rem; font-weight: 500; color: var(--ev-muted); letter-spacing: 0.08em; text-transform: uppercase; }
+.sidebar .brand-sub { color: var(--ev-sidebar-text); }
 
+.sidebar-nav { flex: 1; overflow-y: auto; padding: 0.75rem 0.75rem 1rem; }
+.nav-section {
+  font-size: 0.68rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
+  color: #64748b; padding: 1rem 0.75rem 0.4rem;
+}
+.sidebar .nav-link {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.55rem 0.75rem; margin-bottom: 2px;
+  border-radius: var(--ev-radius-sm);
+  color: var(--ev-sidebar-text); font-weight: 500; font-size: 0.92rem;
+  white-space: nowrap;
+}
+.sidebar .nav-link .bi { font-size: 1.1rem; width: 1.25rem; text-align: center; }
+.sidebar .nav-link:hover { background: var(--ev-sidebar-hover); color: var(--ev-sidebar-text-strong); }
 .sidebar .nav-link.active {
-  background: #fff;
-  color: var(--brand);
+  background: var(--ev-sidebar-active-bg); color: var(--ev-sidebar-active);
+  box-shadow: inset 3px 0 0 var(--ev-sidebar-active);
+}
+.sidebar-footer { padding: 0.75rem; border-top: 1px solid rgba(148, 163, 184, 0.10); }
+.btn-sidebar-collapse {
+  width: 100%; align-items: center; gap: 0.75rem; color: var(--ev-sidebar-text);
+  border: 0; padding: 0.5rem 0.75rem; border-radius: var(--ev-radius-sm); font-size: 0.85rem;
+}
+.btn-sidebar-collapse:hover { background: var(--ev-sidebar-hover); color: var(--ev-sidebar-text-strong); }
+
+/* collapsed (desktop only) */
+@media (min-width: 992px) {
+  .sidebar-collapsed .sidebar { width: var(--ev-sidebar-w-collapsed); }
+  .sidebar-collapsed .sidebar .nav-label,
+  .sidebar-collapsed .sidebar .brand-text,
+  .sidebar-collapsed .sidebar .nav-badge { display: none; }
+  .sidebar-collapsed .sidebar .nav-section { font-size: 0; padding: 0.6rem 0; border-top: 1px solid rgba(148, 163, 184, 0.1); margin: 0 0.5rem; }
+  .sidebar-collapsed .sidebar .nav-link { justify-content: center; }
+  .sidebar-collapsed .btn-sidebar-collapse { justify-content: center; }
+  .sidebar-collapsed .btn-sidebar-collapse .bi { transform: rotate(180deg); }
 }
 
-.sidebar .nav-link.disabled {
-  color: rgba(255, 255, 255, 0.5);
+.app-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.topbar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 1020;
+  height: var(--ev-topbar-h);
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0 1.5rem;
+  background: color-mix(in srgb, var(--ev-bg) 82%, transparent);
+  backdrop-filter: saturate(160%) blur(10px);
+  border-bottom: 1px solid var(--ev-border);
+}
+.topbar-title { font-weight: 600; font-size: 0.95rem; color: var(--ev-muted); }
+.btn-icon {
+  width: 38px; height: 38px; display: inline-grid; place-items: center;
+  border-radius: 10px; border: 1px solid var(--ev-border);
+  background: var(--ev-surface); color: var(--ev-text);
+}
+.btn-icon:hover { border-color: var(--ev-brand); color: var(--ev-brand); background: var(--ev-surface); }
+.topbar-dot {
+  position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 9px; background: #f59e0b; color: #1f1300; font-size: 0.66rem; font-weight: 700;
+  display: grid; place-items: center; border: 2px solid var(--ev-bg);
+}
+.user-chip {
+  display: flex; align-items: center; gap: 0.6rem; border: 1px solid var(--ev-border);
+  background: var(--ev-surface); border-radius: 12px; padding: 0.3rem 0.6rem 0.3rem 0.3rem;
+}
+.user-chip:hover { border-color: var(--ev-brand); }
+.avatar {
+  width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
+  background: var(--ev-brand-soft); color: var(--ev-brand); font-weight: 700; font-size: 0.85rem;
+}
+[data-bs-theme="light"] .theme-icon-light,
+[data-bs-theme="dark"] .theme-icon-dark { display: none; }
+
+.content { padding: 1.75rem 1.5rem 1rem; flex: 1; width: 100%; max-width: 1600px; margin: 0 auto; }
+.app-footer { color: var(--ev-muted); font-size: 0.78rem; margin-top: 3rem; padding-bottom: 1rem; }
+
+/* ---- public pages (landing, auth) ------------------------------------- */
+.public-nav {
+  position: sticky; top: 0; z-index: 1020; height: var(--ev-topbar-h); display: flex; align-items: center;
+  background: color-mix(in srgb, var(--ev-bg) 80%, transparent); backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--ev-border);
+}
+.public-nav .btn-link { color: var(--ev-text); }
+.public-main { min-height: calc(100vh - var(--ev-topbar-h) - 64px); }
+.public-footer { color: var(--ev-muted); font-size: 0.8rem; padding: 1.5rem 0; border-top: 1px solid var(--ev-border); }
+
+.hero {
+  position: relative; overflow: hidden; padding: 5rem 0 4rem;
+  background:
+    radial-gradient(60rem 30rem at 85% -10%, color-mix(in srgb, var(--ev-brand) 22%, transparent), transparent 60%),
+    radial-gradient(40rem 25rem at -10% 110%, color-mix(in srgb, #6366f1 14%, transparent), transparent 60%);
+}
+.hero h1 { font-size: clamp(2.1rem, 4.5vw, 3.4rem); line-height: 1.08; letter-spacing: -0.035em; }
+.hero .lead { color: var(--ev-muted); font-size: 1.15rem; max-width: 40rem; }
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; font-weight: 600;
+  color: var(--ev-brand); background: var(--ev-brand-softer); border: 1px solid var(--ev-brand-soft);
+  padding: 0.3rem 0.75rem; border-radius: 999px;
+}
+.text-gradient {
+  background: linear-gradient(90deg, var(--ev-brand-600), #6366f1);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.feature-card .feature-icon {
+  width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center;
+  background: var(--ev-brand-soft); color: var(--ev-brand); font-size: 1.2rem; margin-bottom: 0.9rem;
 }
 
-.content {
-  flex: 1;
-  min-width: 0;
+.auth-wrap { min-height: calc(100vh - var(--ev-topbar-h) - 64px); display: grid; place-items: center; padding: 2rem 1rem; }
+.auth-card { width: 100%; max-width: 440px; }
+.auth-card .card-body { padding: 2.25rem !important; }
+
+/* ---- components --------------------------------------------------------- */
+.card {
+  --bs-card-bg: var(--ev-surface);
+  --bs-card-border-color: var(--ev-border);
+  --bs-card-cap-bg: transparent;
+  border-radius: var(--ev-radius);
+  box-shadow: var(--ev-shadow);
+}
+.card.shadow-sm { box-shadow: var(--ev-shadow) !important; }
+.card-header { font-weight: 600; padding: 0.9rem 1.15rem; border-bottom-color: var(--ev-border); }
+.card-footer { background: transparent; border-top-color: var(--ev-border); }
+.card > .list-group:last-child { border-bottom-left-radius: var(--ev-radius); border-bottom-right-radius: var(--ev-radius); }
+.list-group { --bs-list-group-bg: var(--ev-surface); --bs-list-group-border-color: var(--ev-border); }
+
+/* KPI tiles (cards marked .module-card): icon chip + big number */
+.module-card { border: 1px solid var(--ev-border); }
+.module-card .card-body { padding: 1.15rem 1.25rem; }
+.module-card .text-muted.small:first-child { display: flex; align-items: center; gap: 0.55rem; font-weight: 500; }
+.module-card .text-muted.small:first-child .bi {
+  width: 30px; height: 30px; border-radius: 9px; display: inline-grid; place-items: center;
+  background: var(--ev-brand-soft); color: var(--ev-brand); font-size: 0.95rem;
+}
+.module-card .fs-3, .module-card .fs-4 { letter-spacing: -0.02em; margin-top: 0.35rem; }
+
+/* tables */
+.table {
+  --bs-table-bg: transparent;
+  --bs-table-striped-bg: var(--ev-surface-2);
+  --bs-table-hover-bg: var(--ev-brand-softer);
+  --bs-table-border-color: var(--ev-border);
+  margin-bottom: 0;
+}
+.table > thead > tr > th {
+  background: var(--ev-surface-2);
+  color: var(--ev-muted); font-weight: 600; font-size: 0.72rem;
+  text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap;
+  border-bottom: 1px solid var(--ev-border);
+}
+.table > :not(caption) > * > * { padding: 0.7rem 1rem; }
+.table-sm > :not(caption) > * > * { padding: 0.45rem 0.75rem; }
+
+/* buttons: "success" is the brand action colour throughout the app */
+.btn { border-radius: 10px; font-weight: 500; }
+.btn-success {
+  --bs-btn-bg: var(--ev-brand); --bs-btn-border-color: var(--ev-brand);
+  --bs-btn-hover-bg: var(--ev-brand-600); --bs-btn-hover-border-color: var(--ev-brand-600);
+  --bs-btn-active-bg: var(--ev-brand-700); --bs-btn-active-border-color: var(--ev-brand-700);
+  --bs-btn-color: #fff; --bs-btn-hover-color: #fff; --bs-btn-active-color: #fff;
+  box-shadow: 0 1px 2px rgba(15, 118, 110, 0.25);
+}
+[data-bs-theme="dark"] .btn-success { --bs-btn-color: #042f2e; --bs-btn-hover-color: #042f2e; --bs-btn-active-color: #042f2e; }
+.btn-outline-success {
+  --bs-btn-color: var(--ev-brand); --bs-btn-border-color: var(--ev-brand);
+  --bs-btn-hover-bg: var(--ev-brand); --bs-btn-hover-border-color: var(--ev-brand); --bs-btn-hover-color: #fff;
+  --bs-btn-active-bg: var(--ev-brand-700); --bs-btn-active-border-color: var(--ev-brand-700);
+}
+[data-bs-theme="dark"] .btn-outline-success { --bs-btn-hover-color: #042f2e; }
+
+/* forms */
+.form-control, .form-select { border-radius: 10px; background-color: var(--ev-surface); border-color: var(--ev-border); }
+.form-control:focus, .form-select:focus, .form-check-input:focus {
+  border-color: var(--ev-brand); box-shadow: 0 0 0 0.2rem var(--ev-brand-soft);
+}
+.form-check-input:checked { background-color: var(--ev-brand); border-color: var(--ev-brand); }
+.form-label { font-weight: 500; font-size: 0.9rem; }
+.input-group-text { background: var(--ev-surface-2); border-color: var(--ev-border); }
+
+/* nav pills (period tabs etc.) */
+.nav-pills { --bs-nav-pills-link-active-bg: var(--ev-brand); --bs-nav-link-color: var(--ev-muted); gap: 0.25rem; }
+.nav-pills .nav-link { border-radius: 9px; font-weight: 500; }
+[data-bs-theme="dark"] .nav-pills { --bs-nav-pills-link-active-color: #042f2e; }
+
+/* badges and alerts */
+.badge { font-weight: 600; letter-spacing: 0.01em; border-radius: 7px; padding: 0.38em 0.6em; }
+.alert { border-radius: var(--ev-radius-sm); border-width: 1px; }
+.progress { background: var(--ev-surface-2); border-radius: 999px; }
+.dropdown-menu { --bs-dropdown-bg: var(--ev-surface); --bs-dropdown-border-color: var(--ev-border); border-radius: 12px; }
+.dropdown-item { border-radius: 8px; margin: 0 0.35rem; width: auto; }
+.dropdown-menu { padding: 0.35rem 0; }
+pre { background: var(--ev-surface-2) !important; border: 1px solid var(--ev-border); }
+code { color: var(--ev-brand-700); }
+
+/* maps: dark mode inverts only the base tiles (markers keep their colours) */
+[data-bs-theme="dark"] .leaflet-tile-pane { filter: invert(100%) hue-rotate(180deg) brightness(0.92) contrast(0.88) saturate(0.6); }
+.leaflet-container { background: var(--ev-surface-2); font-family: var(--ev-font); border-radius: var(--ev-radius); }
+.card .leaflet-container { border-radius: 0; }
+.leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--ev-surface); color: var(--ev-text); }
+.leaflet-tooltip { background: var(--ev-surface); color: var(--ev-text); border-color: var(--ev-border); }
+.leaflet-bar a { background: var(--ev-surface); color: var(--ev-text); border-color: var(--ev-border); }
+
+/* small screens */
+@media (max-width: 991.98px) {
+  .content { padding: 1.25rem 1rem; }
+  .topbar { padding: 0 1rem; }
 }
 
-.module-card {
-  border: 0;
-  border-left: 4px solid var(--brand);
-}
-
-@media (max-width: 768px) {
-  .app-shell {
-    flex-direction: column;
-  }
-
-  .sidebar {
-    width: 100%;
-  }
-}
+/* link-style buttons use the brand colour (Bootstrap defaults to blue) */
+.btn-link { --bs-btn-color: var(--ev-brand); --bs-btn-hover-color: var(--ev-brand-700); --bs-btn-active-color: var(--ev-brand-700); }

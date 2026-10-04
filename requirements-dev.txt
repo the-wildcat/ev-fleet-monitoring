@@ -8,3 +8,6 @@ pdfplumber==0.11.10
 pytest==9.1.1
 pytest-cov==7.1.0
 ruff==0.16.10
+
+# Page screenshots (scripts/screenshots.py; drives the installed Google Chrome)
+playwright==1.63.0

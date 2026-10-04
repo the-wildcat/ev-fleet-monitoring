@@ -228,6 +228,30 @@ Each script prints a cleaning report: duplicates, invalid coordinates or measure
 normalised connector types. The original submission's datasets (a synthetic battery sheet and an
 unofficial station list) are kept in `legacy/datasets/` for reference.
 
+## User interface
+
+The interface uses a shared layout (`app/templates/base.html`): a collapsible sidebar grouped by
+task (Monitor, Analyse, Plan, Admin), a top bar with the alerts bell, theme switch and user menu,
+and a public landing page with sign-up and log-in.
+
+- **Light and dark themes.** The first visit follows the operating system's setting, and the toggle
+  remembers the choice in the browser. Colours are defined once as CSS variables in
+  `app/static/css/app.css`. Charts (Chart.js) and maps (Leaflet) restyle themselves when the theme
+  changes (`app/static/js/app.js`).
+- **Responsive.** On phones the sidebar becomes a slide-out menu.
+- **Maps** use OpenStreetMap tiles (no API key). In dark mode only the base map is darkened, so
+  the vehicle markers keep their status colours.
+- **Live map motion.** Vehicles drive along real road geometry (`data/sim_routes.json`, built from
+  OSRM by `scripts/build_sim_routes.py`). The browser animates each marker smoothly between the
+  5-second updates.
+
+Screenshots of every page in both themes can be regenerated with Playwright, which uses the
+installed Google Chrome:
+
+```powershell
+python -m scripts.screenshots --out docs/screenshots
+```
+
 ## Project layout
 
 ```
@@ -249,11 +273,12 @@ app/            Flask application (app factory, blueprints, templates, static fi
   services/     email, telemetry, simulator, alerts, routing, battery model, driving,
                 maintenance rules, notifications, background jobs, energy roll-up, settings,
                 report definitions and exporters (CSV/Excel/PDF)
-  main/         overview dashboard and /healthz endpoint
+  main/         landing page, overview dashboard and /healthz endpoint
+  static/       shared CSS (design tokens, light/dark) and JS (theme, charts, map tiles)
   cli.py        create-admin, set-role, send-test-email, seed-vehicles, simulate,
                 prune-telemetry, check-maintenance, send-alert-emails, rollup-energy
 migrations/     database schema versions (Alembic via Flask-Migrate)
-scripts/        rebuild datasets from their official sources
+scripts/        rebuild datasets from their official sources; page screenshots
 ml/             model training script and model card
 models/         trained model + metadata (committed, so the app works without retraining)
 data/           datasets used by the app

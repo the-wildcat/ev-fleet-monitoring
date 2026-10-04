@@ -58,7 +58,7 @@
               <div>
                 <strong>{{ a.alert_type.label }}</strong>
                 <span class="badge {{ 'text-bg-danger' if critical else 'text-bg-warning' }}">{{ a.severity.value|title }}</span>
-                <span class="badge text-bg-light">{{ a.alert_type.category|title }}</span>
+                <span class="badge bg-secondary-subtle text-secondary-emphasis">{{ a.alert_type.category|title }}</span>
                 · <a href="{{ url_for('vehicles.vehicle_detail', vehicle_id=a.vehicle_id) }}">{{ a.vehicle.plate_number }}</a>
                 <span class="text-muted small">{{ a.vehicle.display_name }}</span>
               </div>
@@ -104,7 +104,7 @@
     </div>
   {% endif %}
   {% if pages > 1 %}
-    <div class="card-footer bg-white d-flex justify-content-between align-items-center small">
+    <div class="card-footer d-flex justify-content-between align-items-center small">
       <span>{{ total }} alerts · page {{ page }} of {{ pages }}</span>
       <span>
         {% if page > 1 %}<a href="{{ filter_url(page=page - 1) }}">← Newer</a>{% endif %}

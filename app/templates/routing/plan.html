@@ -98,7 +98,7 @@
 
       <div class="card shadow-sm mb-3">
         <div id="route-map" aria-label="Route map with charging stops"></div>
-        <div class="card-footer bg-white small text-muted">
+        <div class="card-footer small text-muted">
           {{ plan.origin.label|truncate(60) }} → {{ plan.destination.label|truncate(60) }}
           · {{ plan.nearby|length }} car chargers within {{ form.corridor_km.data|int }} km of the route
           (green: ≥ {{ plan.ev.min_charger_kw|int }} kW, grey: slower)
@@ -108,10 +108,10 @@
 
       {% if plan.stops %}
         <div class="card shadow-sm mb-3">
-          <div class="card-header bg-white fw-semibold">Charging stops</div>
+          <div class="card-header fw-semibold">Charging stops</div>
           <div class="table-responsive">
             <table class="table align-middle mb-0">
-              <thead class="table-light"><tr><th>#</th><th>Station</th><th>Charger</th><th>At</th><th>Arrive</th><th>Charge to</th><th>Charging</th></tr></thead>
+              <thead><tr><th>#</th><th>Station</th><th>Charger</th><th>At</th><th>Arrive</th><th>Charge to</th><th>Charging</th></tr></thead>
               <tbody>
                 {% for s in plan.stops %}
                   <tr>
@@ -127,7 +127,7 @@
               </tbody>
             </table>
           </div>
-          <div class="card-footer bg-white small text-muted">
+          <div class="card-footer small text-muted">
             Charging power is the lower of the station's rating and the car's limit ({{ plan.ev.max_charge_kw|int }} kW),
             held constant; real DC charging slows above ~80%. Station data: Bureau of Energy Efficiency, Govt. of India.
           </div>
@@ -136,7 +136,7 @@
 
       {% if result.alternatives %}
         <div class="card shadow-sm">
-          <div class="card-header bg-white fw-semibold">Other routes considered</div>
+          <div class="card-header fw-semibold">Other routes considered</div>
           <ul class="list-group list-group-flush">
             {% for alt in result.alternatives %}
               <li class="list-group-item small">
@@ -187,9 +187,7 @@
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => (
     { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const map = L.map("route-map");
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19, attribution: "&copy; OpenStreetMap contributors",
-  }).addTo(map);
+  EV.tileLayer(map);
   const line = L.polyline(data.route, { color: "#2e7d32", weight: 5 }).addTo(map);
   for (const [lat, lon, name, kw] of data.nearby) {
     const fast = kw >= data.min_kw;
