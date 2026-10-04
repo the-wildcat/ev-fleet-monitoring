@@ -12,6 +12,11 @@ Built with Flask, SQLAlchemy and scikit-learn, using real data: India's official
 charging-station list and NASA's battery ageing dataset. Developed as the project for the
 Infosys Springboard internship.
 
+**Live demo:** <https://ev-fleet-monitoring-gkkp.onrender.com> (free hosting: the first visit after
+a quiet period takes about a minute while the server wakes up). New sign-ups get the Driver
+role and see only vehicles assigned to them; the fleet-wide pages need a fleet manager or admin
+account.
+
 <p align="center">
   <img src="docs/screenshots/overview-light.webp" alt="Fleet overview dashboard" width="49%">
   <img src="docs/screenshots/live-map-dark.webp" alt="Live fleet map in dark mode" width="49%">

@@ -1,4 +1,4 @@
-from flask import jsonify, render_template
+from flask import jsonify, redirect, render_template, url_for
 from flask_login import current_user
 from sqlalchemy import text
 
@@ -29,3 +29,9 @@ def healthz():
         return jsonify(status="ok", database="ok")
     except Exception:
         return jsonify(status="degraded", database="unreachable"), 503
+
+
+@bp.route("/favicon.ico")
+def favicon():
+    """Browsers request /favicon.ico on their own; point them at the SVG icon."""
+    return redirect(url_for("static", filename="favicon.svg"), code=301)

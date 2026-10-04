@@ -36,3 +36,10 @@ def test_production_refuses_placeholder_secret(monkeypatch):
     monkeypatch.setattr("app.config.ProductionConfig.SECRET_KEY", "change-me")
     with pytest.raises(RuntimeError, match="placeholder"):
         create_app("production")
+
+
+def test_favicon(client):
+    resp = client.get("/favicon.ico")
+    assert resp.status_code == 301 and resp.location.endswith("/static/favicon.svg")
+    assert client.get("/static/favicon.svg").status_code == 200
+    assert b'rel="icon"' in client.get("/").data
