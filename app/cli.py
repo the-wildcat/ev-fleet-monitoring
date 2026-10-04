@@ -1,6 +1,8 @@
 """Custom `flask` commands, e.g. `flask create-admin`."""
 
+import os
 import random
+import secrets
 import smtplib
 
 import click
@@ -25,39 +27,94 @@ DEMO_MODELS = [
 DEMO_STATE_CODES = ["DL", "KA", "MH", "WB", "TS"]
 
 
+DEMO_DRIVERS = ["Ravi Kumar", "Priya Das", "Arjun Mehta", "Sara Khan"]
+
+
+def add_demo_vehicles(count: int) -> int:
+    """Add `count` simulated EVs with random Indian plates, shared out among the drivers."""
+    rng = random.Random()
+    drivers = db.session.execute(db.select(User).where(User.role == Role.DRIVER)).scalars().all()
+    added = 0
+    while added < count:
+        make, model, kwh, eff = rng.choice(DEMO_MODELS)
+        plate = (
+            f"{rng.choice(DEMO_STATE_CODES)}{rng.randint(1, 99):02d}"
+            f"{rng.choice('ABCDEFGHJKLMNPRSTUVWXYZ')}{rng.choice('ABCDEFGHJKLMNPRSTUVWXYZ')}"
+            f"{rng.randint(1000, 9999)}"
+        )
+        if db.session.execute(db.select(Vehicle.id).filter_by(plate_number=plate)).first():
+            continue
+        vehicle = Vehicle(
+            make=make,
+            model=model,
+            year=rng.randint(2021, 2026),
+            plate_number=plate,
+            battery_capacity_kwh=kwh,
+            efficiency_km_per_kwh=eff,
+            driver_id=drivers[added % len(drivers)].id if drivers else None,
+        )
+        vehicle.issue_api_key()  # unused by simulated vehicles; rotate in the UI when needed
+        db.session.add(vehicle)
+        added += 1
+    db.session.commit()
+    return added
+
+
 def register_cli(app: Flask) -> None:
     @app.cli.command("seed-vehicles")
     @click.option("--count", default=6, show_default=True, help="How many demo EVs to add.")
     def seed_vehicles(count: int) -> None:
         """Add demo EVs (simulated) so the dashboards have something to show."""
-        rng = random.Random()
-        drivers = (
-            db.session.execute(db.select(User).where(User.role == Role.DRIVER)).scalars().all()
-        )
-        added = 0
-        while added < count:
-            make, model, kwh, eff = rng.choice(DEMO_MODELS)
-            plate = (
-                f"{rng.choice(DEMO_STATE_CODES)}{rng.randint(1, 99):02d}"
-                f"{rng.choice('ABCDEFGHJKLMNPRSTUVWXYZ')}{rng.choice('ABCDEFGHJKLMNPRSTUVWXYZ')}"
-                f"{rng.randint(1000, 9999)}"
-            )
-            if db.session.execute(db.select(Vehicle.id).filter_by(plate_number=plate)).first():
-                continue
-            vehicle = Vehicle(
-                make=make,
-                model=model,
-                year=rng.randint(2021, 2026),
-                plate_number=plate,
-                battery_capacity_kwh=kwh,
-                efficiency_km_per_kwh=eff,
-                driver_id=drivers[added % len(drivers)].id if drivers else None,
-            )
-            vehicle.issue_api_key()  # unused by simulated vehicles; rotate in the UI when needed
-            db.session.add(vehicle)
-            added += 1
+        click.echo(f"Added {add_demo_vehicles(count)} demo vehicles.")
+
+    @app.cli.command("bootstrap")
+    def bootstrap() -> None:
+        """Prepare a fresh deployment; safe to run on every start.
+
+        Creates the admin from ADMIN_EMAIL / ADMIN_PASSWORD (and optional ADMIN_NAME) if that
+        account doesn't exist yet. With SEED_DEMO_DATA=true it also adds demo drivers and
+        vehicles, but only while the fleet is empty.
+        """
+        email = os.environ.get("ADMIN_EMAIL", "").strip().lower()
+        password = os.environ.get("ADMIN_PASSWORD", "")
+        if email and password:
+            if db.session.execute(db.select(User.id).filter_by(email=email)).first():
+                click.echo(f"Admin {email} already exists.")
+            elif len(password) < 8:
+                raise click.ClickException("ADMIN_PASSWORD must be at least 8 characters.")
+            else:
+                name = os.environ.get("ADMIN_NAME", "Administrator")
+                admin = User(name=name, email=email, role=Role.ADMIN, is_verified=True)
+                admin.set_password(password)
+                db.session.add(admin)
+                db.session.commit()
+                click.echo(f"Admin {email} created.")
+
+        seed = os.environ.get("SEED_DEMO_DATA", "false").lower() == "true"
+        if seed and not db.session.execute(db.select(Vehicle.id)).first():
+            for name in DEMO_DRIVERS:
+                local = name.split()[0].lower()
+                driver = User(
+                    name=name, email=f"{local}@example.com", role=Role.DRIVER, is_verified=True
+                )
+                # Demo drivers only exist to be assigned to vehicles; nobody can log in as them.
+                driver.set_password(secrets.token_urlsafe(32))
+                db.session.add(driver)
+            db.session.commit()
+            click.echo(f"Added {add_demo_vehicles(8)} demo vehicles.")
+
+    @app.cli.command("rotate-api-key")
+    @click.argument("plate")
+    def rotate_api_key(plate: str) -> None:
+        """Issue a new device API key for a vehicle (the old key stops working)."""
+        vehicle = db.session.execute(
+            db.select(Vehicle).filter_by(plate_number=plate.strip().upper())
+        ).scalar_one_or_none()
+        if vehicle is None:
+            raise click.ClickException(f"No vehicle with plate {plate}.")
+        key = vehicle.issue_api_key()
         db.session.commit()
-        click.echo(f"Added {added} demo vehicles.")
+        click.echo(key)
 
     @app.cli.command("simulate")
     @click.option("--once", is_flag=True, help="Run a single tick and exit.")

@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install ruff==0.16.10
+      - run: ruff check .
+      - run: ruff format --check .
+
+  test:
+    name: Tests (${{ matrix.database }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [sqlite, postgres]
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: ev
+          POSTGRES_PASSWORD: ev
+          POSTGRES_DB: ev_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ev"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      TEST_DATABASE_URL: ${{ matrix.database == 'postgres' && 'postgresql://ev:ev@localhost:5432/ev_test' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - run: pip install -r requirements-dev.txt
+      - name: Run tests with coverage
+        run: pytest --cov --cov-report=term-missing:skip-covered
+
+  e2e:
+    name: Docker image + API tests
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and start the stack
+        run: docker compose up --build --detach --wait --wait-timeout 180
+      - name: Issue a device key for a demo vehicle
+        run: |
+          plate=$(docker compose exec -T db psql -U ev_fleet -d ev_fleet -tAc "SELECT plate_number FROM vehicles ORDER BY id LIMIT 1")
+          key=$(docker compose exec -T web flask rotate-api-key "$plate" | tail -n 1)
+          echo "::add-mask::$key"
+          echo "API_KEY=$key" >> "$GITHUB_ENV"
+      - name: Run the Postman collection
+        run: >
+          docker run --rm --network host -v "$PWD/postman:/etc/newman" postman/newman:6-alpine
+          run ev-fleet-monitoring.postman_collection.json
+          --env-var baseUrl=http://localhost:8000 --env-var "apiKey=$API_KEY"
+      - name: Show application logs
+        if: failure()
+        run: docker compose logs web
+      - name: Stop the stack
+        if: always()
+        run: docker compose down --volumes

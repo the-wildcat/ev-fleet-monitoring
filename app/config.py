@@ -36,7 +36,11 @@ class Config:
     )
 
     # Public address of the site, used for links in emails sent outside a web request
-    APP_BASE_URL = os.environ.get("APP_BASE_URL", "http://127.0.0.1:5000")
+    APP_BASE_URL = (
+        os.environ.get("APP_BASE_URL")
+        or os.environ.get("RENDER_EXTERNAL_URL")  # set automatically on Render
+        or "http://127.0.0.1:5000"
+    )
 
     # Display timezone (timestamps are stored in UTC)
     APP_TIMEZONE = os.environ.get("APP_TIMEZONE", "Asia/Kolkata")
@@ -108,16 +112,23 @@ class Config:
     # Built from India's official BEE list by scripts/build_charging_stations.py
     CHARGING_STATIONS_PATH = BASE_DIR / "data" / "charging_stations_india.csv"
 
-    # Wait up to 15 s for a lock instead of failing when two writers overlap (SQLite only).
-    SQLALCHEMY_ENGINE_OPTIONS = {"connect_args": {"timeout": 15}}
+    @staticmethod
+    def database_url(default: str, env_var: str = "DATABASE_URL") -> str:
+        url = os.environ.get(env_var) or default
+        # Hosting providers hand out "postgres://" or "postgresql://" URLs. SQLAlchemy 2 rejects
+        # the first and maps the second to psycopg2, so point both at psycopg 3.
+        for prefix in ("postgres://", "postgresql://"):
+            if url.startswith(prefix):
+                return "postgresql+psycopg://" + url.removeprefix(prefix)
+        return url
 
     @staticmethod
-    def database_url(default: str) -> str:
-        url = os.environ.get("DATABASE_URL") or default
-        # Render/Heroku hand out "postgres://", which SQLAlchemy 2 no longer accepts.
-        if url.startswith("postgres://"):
-            url = url.replace("postgres://", "postgresql+psycopg://", 1)
-        return url
+    def engine_options(url: str) -> dict:
+        if url.startswith("sqlite"):
+            # Wait up to 15 s for a lock instead of failing when two writers overlap.
+            return {"connect_args": {"timeout": 15}}
+        # Drop pooled connections the server has closed (idle timeouts, restarts).
+        return {"pool_pre_ping": True}
 
 
 class DevelopmentConfig(Config):
@@ -126,12 +137,15 @@ class DevelopmentConfig(Config):
     SQLALCHEMY_DATABASE_URI = Config.database_url(
         f"sqlite:///{BASE_DIR / 'instance' / 'ev_fleet.db'}"
     )
+    SQLALCHEMY_ENGINE_OPTIONS = Config.engine_options(SQLALCHEMY_DATABASE_URI)
 
 
 class TestingConfig(Config):
     TESTING = True
     SECRET_KEY = "test-key"
-    SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+    # In-memory SQLite by default; CI also runs the suite against PostgreSQL.
+    SQLALCHEMY_DATABASE_URI = Config.database_url("sqlite:///:memory:", "TEST_DATABASE_URL")
+    SQLALCHEMY_ENGINE_OPTIONS = Config.engine_options(SQLALCHEMY_DATABASE_URI)
     WTF_CSRF_ENABLED = False
     MAIL_SERVER = ""  # never send real email from tests
     SIMULATOR_ENABLED = False
@@ -140,15 +154,17 @@ class TestingConfig(Config):
 
 class ProductionConfig(Config):
     DEBUG = False
-    SESSION_COOKIE_SECURE = True
-    REMEMBER_COOKIE_SECURE = True
+    # Cookies only over HTTPS. Set SESSION_COOKIE_SECURE=false to try the production image
+    # over plain http (e.g. docker compose on localhost).
+    SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "true").lower() == "true"
+    REMEMBER_COOKIE_SECURE = SESSION_COOKIE_SECURE
     SQLALCHEMY_DATABASE_URI = Config.database_url(
         f"sqlite:///{BASE_DIR / 'instance' / 'ev_fleet.db'}"
     )
-    # The SQLite `timeout` argument isn't valid for other drivers (e.g. PostgreSQL).
-    SQLALCHEMY_ENGINE_OPTIONS = (
-        Config.SQLALCHEMY_ENGINE_OPTIONS if SQLALCHEMY_DATABASE_URI.startswith("sqlite") else {}
-    )
+    SQLALCHEMY_ENGINE_OPTIONS = Config.engine_options(SQLALCHEMY_DATABASE_URI)
+    # Behind Render's (or any) reverse proxy, trust one hop of X-Forwarded-* headers so
+    # generated links use https and the real client address is logged.
+    PROXY_FIX = True
 
 
 CONFIGS = {

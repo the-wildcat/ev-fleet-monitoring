@@ -1,32 +1,222 @@
 # EV Fleet Monitoring
 
-Real-Time EV Fleet Monitoring and Predictive Analytics Solution, an Infosys Springboard
-internship project being rebuilt module by module to production standards.
+Real-time monitoring and predictive analytics for electric vehicle fleets: live vehicle
+tracking, battery health prediction, charging-aware route planning, driver behaviour scoring,
+maintenance alerts, energy and cost analysis, and exportable reports.
 
-> **Status:** all six modules in the project specification are complete (authentication and
-> roles; EV registration and real-time monitoring; route optimisation and battery health;
-> driver behaviour and maintenance alerts; energy and cost analysis; report generation).
-> Deployment packaging (Docker, CI, hosting) is in progress; see the roadmap below.
+Built with Flask, SQLAlchemy and scikit-learn, using real data: India's official public
+charging-station list and NASA's battery ageing dataset. Developed as the project for the
+Infosys Springboard internship.
 
-## Quick start (Windows / PowerShell)
+<p align="center">
+  <img src="docs/screenshots/overview-light.webp" alt="Fleet overview dashboard" width="49%">
+  <img src="docs/screenshots/live-map-dark.webp" alt="Live fleet map in dark mode" width="49%">
+</p>
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements-dev.txt
-Copy-Item .env.example .env      # then edit values if needed
-flask db upgrade                 # create/update the database tables
-flask create-admin               # create the first administrator (prompts for details)
-flask seed-vehicles              # optional: add 6 demo EVs driven by the simulator
-flask run                        # open http://127.0.0.1:5000
-pytest                           # run the test suite
-ruff check .                     # lint
+## Contents
+
+- [Features](#features)
+- [Screenshots](#screenshots)
+- [Architecture](#architecture)
+- [Getting started](#getting-started)
+- [Configuration](#configuration)
+- [Deployment](#deployment)
+- [API](#api)
+- [Testing and quality](#testing-and-quality)
+- [Modules in detail](#modules-in-detail)
+- [Data sources](#data-sources)
+- [Project structure](#project-structure)
+- [Design decisions and limitations](#design-decisions-and-limitations)
+- [License](#license)
+
+## Features
+
+| Area | What it does |
+|---|---|
+| Accounts and roles | Sign-up with email verification, password reset, login lockout; Admin, Fleet Manager and Driver roles |
+| Vehicles and live monitoring | EV registry with service history; live map refreshed every 5 s; per-vehicle route and charts; device telemetry API |
+| Route planning | Road routes (OSRM) with charging stops chosen from 14,357 official car charging stations |
+| Battery health | Random-forest state-of-health model trained on NASA cell-ageing data; low-charge, overheating and wear alerts |
+| Driver behaviour | Harsh braking, harsh acceleration and speeding per 100 km; safety score; energy impact |
+| Maintenance | Rule-based service, brake, battery-check and device-offline alerts; inbox with acknowledge/resolve; email for critical alerts |
+| Energy and cost | Daily energy roll-up, cost per km, charging spend, savings versus petrol, CO₂ avoided |
+| Reports | Customisable reports exported as Excel, PDF or CSV |
+| Administration | User and role management; tariff, fuel price and speed-limit settings |
+| Interface | Responsive layout, light and dark themes |
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Landing page](docs/screenshots/landing-dark.webp) | ![Route planner](docs/screenshots/route-planner-light.webp) |
+| Landing page (dark theme) | Route planner: New Delhi → Jaipur with two charging stops |
+| ![Vehicle detail](docs/screenshots/vehicle-detail-light.webp) | ![Driver behaviour](docs/screenshots/driver-behaviour-light.webp) |
+| Vehicle page: last hour's route, speed and charge | Driver leaderboard and safety-vs-energy chart |
+| ![Energy and cost](docs/screenshots/energy-cost-dark.webp) | ![Reports](docs/screenshots/reports-light.webp) |
+| Energy and cost analysis (dark theme) | Report builder with live preview |
+
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph Sources
+        SIM[Telemetry simulator]
+        DEV[Vehicle devices]
+    end
+    subgraph App["Flask application (gunicorn)"]
+        API["/api/v1 telemetry and battery API"]
+        WEB[Web pages and blueprints]
+        SVC[Services: alerts, maintenance rules, driver scoring, energy roll-up, reports]
+        JOBS[Background jobs]
+        ML[Battery SoH model]
+    end
+    DB[(PostgreSQL / SQLite)]
+    EXT[OpenStreetMap: Nominatim and OSRM]
+    SMTP[SMTP email]
+
+    DEV -->|X-API-Key| API
+    SIM --> SVC
+    API --> SVC
+    WEB --> SVC
+    JOBS --> SVC
+    SVC --> DB
+    WEB --> ML
+    WEB --> EXT
+    SVC --> SMTP
 ```
 
-In Git Bash on Windows, activate with `source .venv/Scripts/activate`. On macOS/Linux, use
-`source .venv/bin/activate`. In both, copy the env file with `cp .env.example .env`.
+- **Application factory and blueprints:** one blueprint per feature area, with business logic in
+  `app/services/` so pages, the API, CLI commands and background jobs share the same code.
+- **Telemetry path:** the simulator and the device API both call the same `record_reading()`
+  function, which stores the reading and evaluates the battery alert rules. Everything
+  downstream works the same whichever source the data came from.
+- **Background work:** the simulator and periodic jobs (maintenance rules, energy roll-up,
+  telemetry pruning, alert emails) run as threads in the web process. Each is also available as
+  a CLI command, so an external scheduler can run them instead.
+- **Database:** SQLAlchemy 2 models with Alembic migrations; SQLite for development and
+  PostgreSQL in production. The test suite runs against both in CI.
 
-## Users and roles
+**Tech stack:** Python 3.13 · Flask 3 · SQLAlchemy 2 · Flask-Migrate · Flask-Login · Flask-WTF ·
+pandas · scikit-learn · ReportLab · openpyxl · Bootstrap 5 · Chart.js · Leaflet · gunicorn ·
+PostgreSQL · Docker · GitHub Actions
+
+## Getting started
+
+### Run locally
+
+Requires Python 3.11 or newer.
+
+```bash
+python -m venv .venv
+source .venv/bin/activate          # Windows PowerShell: .\.venv\Scripts\Activate.ps1
+pip install -r requirements-dev.txt
+cp .env.example .env               # Windows PowerShell: Copy-Item .env.example .env
+flask db upgrade                   # create the database tables
+flask create-admin                 # first administrator (prompts for details)
+flask seed-vehicles                # optional: demo EVs driven by the simulator
+flask run                          # http://127.0.0.1:5000
+```
+
+Without SMTP settings, verification and password-reset links are printed in the terminal
+running `flask run`.
+
+### Run with Docker
+
+Runs the production image with PostgreSQL, the same setup as the hosted deployment:
+
+```bash
+docker compose up --build
+```
+
+Open http://localhost:8000 and log in as `admin@example.com` / `ChangeMe123`. Change these by
+setting `ADMIN_EMAIL` and `ADMIN_PASSWORD` in your shell or in a `.env` file before the first
+start. Demo drivers and vehicles are added automatically. `docker compose down -v` removes the
+containers and the database volume.
+
+## Configuration
+
+Settings are read from environment variables (or `.env`); see [`.env.example`](.env.example)
+for the full list with comments.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `APP_ENV` | `development` | `development`, `production` or `testing` |
+| `SECRET_KEY` | — | Required in production; signs sessions and email links |
+| `DATABASE_URL` | SQLite in `instance/` | e.g. `postgresql://user:pass@host:5432/ev_fleet` |
+| `MAIL_SERVER`, `MAIL_USERNAME`, `MAIL_PASSWORD` | empty | SMTP for emails; empty prints them to the log |
+| `SIMULATOR_ENABLED` | `true` | Built-in telemetry simulator |
+| `SIMULATOR_TIME_SCALE` | `3` | 3 is near real time; 12 drains batteries visibly for demos |
+| `BACKGROUND_JOBS_ENABLED` | `true` | Maintenance rules, energy roll-up, pruning, alert emails |
+| `ALERT_EMAILS_ENABLED` | `false` | Email managers about new critical alerts |
+| `TELEMETRY_RETENTION_DAYS` | `7` | Raw readings kept; daily energy totals are kept permanently |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | empty | Admin created on start-up by `flask bootstrap` (Docker/Render) |
+| `SEED_DEMO_DATA` | `false` | Add demo drivers and vehicles to an empty fleet on start-up |
+
+Electricity tariff, charging efficiency, petrol price and mileage, and the fleet speed limit
+can also be changed by an admin on the Settings page.
+
+## Deployment
+
+The repository includes a [Render](https://render.com) Blueprint ([`render.yaml`](render.yaml))
+for the Docker image and a managed PostgreSQL database:
+
+1. In the Render dashboard choose **New → Blueprint** and select this repository.
+2. Enter `ADMIN_EMAIL` and `ADMIN_PASSWORD` for the first administrator, and SMTP settings if
+   you want emails sent (otherwise they appear in the service log).
+3. Render builds the image. On every start the container runs `flask db upgrade` and
+   `flask bootstrap` (admin and demo data, both idempotent) before starting gunicorn.
+
+`SECRET_KEY` is generated by Render, and `/healthz` is used as the health check. On the free
+plan the service sleeps after about 15 minutes without traffic (the simulator pauses with it),
+and the free database expires after 30 days.
+
+The image works on any container platform: it runs as a non-root user, listens on `$PORT`
+(default 8000) and has a built-in health check.
+
+## API
+
+Versioned JSON API under `/api/v1`. Errors use a consistent shape:
+`{"error": "...", "message": "...", "details": [...]}`.
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| `POST` | `/api/v1/telemetry` | `X-API-Key` (per vehicle) | Ingest one reading or a batch of up to 100 |
+| `POST` | `/api/v1/predict/battery` | none (stateless) | Battery state-of-health prediction, single or batch |
+| `GET` | `/healthz` | none | Liveness and database check |
+
+A Postman collection with example requests and tests is in
+[`postman/`](postman/ev-fleet-monitoring.postman_collection.json). Set `baseUrl` and `apiKey`
+(issue a device key on the vehicle page or with `flask rotate-api-key <plate>`). It also runs
+headless:
+
+```bash
+npx newman run postman/ev-fleet-monitoring.postman_collection.json \
+  --env-var baseUrl=http://127.0.0.1:5000 --env-var apiKey=evk_...
+```
+
+## Testing and quality
+
+```bash
+pytest --cov            # unit and integration tests with coverage
+ruff check .            # lint
+ruff format --check .   # formatting
+```
+
+Set `TEST_DATABASE_URL` to run the suite against PostgreSQL instead of in-memory SQLite.
+
+GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs on every push and
+pull request:
+
+1. **Lint:** ruff checks and formatting.
+2. **Tests:** the full suite on SQLite and on PostgreSQL 17, failing below 90% coverage.
+3. **End to end:** builds the Docker image, starts it with PostgreSQL via Docker Compose and
+   runs the Postman collection against it.
+
+External services (Nominatim, OSRM, SMTP) are mocked in tests.
+
+## Modules in detail
+
+### Users and roles
 
 | Role | How you get it | Can do |
 |---|---|---|
@@ -42,7 +232,7 @@ Security measures: passwords hashed with scrypt; CSRF protection on every form; 
 after 5 failed logins (15 minutes); signed, expiring, single-use reset links; no account
 enumeration through sign-up, login or reset; safe post-login redirects.
 
-## Vehicles and real-time monitoring
+### Vehicles and real-time monitoring
 
 Managers register EVs (make, model, registration number, battery size, efficiency, assigned
 driver) and keep a service history for each. Every vehicle reports telemetry: location, speed,
@@ -53,7 +243,7 @@ battery charge (SoC), charging state, battery temperature and odometer. That dat
 - **Vehicle page**: live figures, the last hour's route, and speed/battery charts.
 - **Overview**: fleet totals (online, charging, average charge, low battery).
 
-### Where telemetry comes from
+#### Where telemetry comes from
 
 | Source | When to use | How |
 |---|---|---|
@@ -65,7 +255,7 @@ Simulator settings in `.env`: `SIMULATOR_ENABLED`, `SIMULATOR_INTERVAL_SECONDS` 
 drain visibly). Event rates are scaled to the tick length, so driver scores don't depend on it. To run it as
 a separate process instead, set `SIMULATOR_ENABLED=false` and run `flask simulate`.
 
-### Telemetry API
+#### Telemetry API
 
 ```bash
 curl -X POST http://127.0.0.1:5000/api/v1/telemetry \
@@ -82,7 +272,7 @@ Responses: `201 {"accepted": n}`; `400` with per-field errors; `401` bad key; `4
 Readings older than `TELEMETRY_RETENTION_DAYS` (default 7) are pruned automatically, or with
 `flask prune-telemetry`.
 
-## Route planner
+### Route planner
 
 `/routes/plan` plans a trip for a fleet vehicle (or a custom EV) from a place name, coordinates
 or the vehicle's current location:
@@ -101,7 +291,7 @@ or the vehicle's current location:
 4. Every alternative route is planned and the quickest feasible one (driving + charging) is
    recommended. If none works, the planner explains why and checks whether charging to 100% would.
 
-## Battery health and alerts
+### Battery health and alerts
 
 - **ML health check** (`/battery`): estimates state of health (SoH, % of rated capacity) from
   measurements a BMS or service diagnostic can take without a full capacity test. It is a
@@ -124,7 +314,7 @@ or the vehicle's current location:
 The wear thresholds follow EV practice: 80% is the usual end-of-first-life mark, and battery
 warranties typically guarantee 70%.
 
-## Driver behaviour
+### Driver behaviour
 
 `/drivers` (managers: fleet leaderboard; drivers: their own scorecard) analyses telemetry for
 today, the last 7 days or the last 30 days:
@@ -143,7 +333,7 @@ today, the last 7 days or the last 30 days:
 - The scorecard shows a daily trend, an event breakdown with a coaching tip, and recent events
   with map links.
 
-## Maintenance alerts and the alerts inbox
+### Maintenance alerts and the alerts inbox
 
 Rules run automatically every 10 minutes in the background (or with `flask check-maintenance`):
 
@@ -162,7 +352,7 @@ reopens automatically if its rule fires again. The sidebar shows the number of o
 critical alerts by the background jobs, at most once per vehicle and alert type every 6 hours.
 `flask send-alert-emails` sends pending ones manually.
 
-## Energy and cost analysis
+### Energy and cost analysis
 
 `/analytics` covers the last 7, 30 or 90 days for the whole fleet or one vehicle (drivers see
 their own vehicles):
@@ -187,7 +377,7 @@ rebuilds past days.
 comparable petrol mileage and the fleet speed limit. Defaults come from `.env`; changes apply
 immediately.
 
-## Reports
+### Reports
 
 `/reports` builds customisable reports: choose the report, a date range (up to a year), the
 vehicles, the columns and a title, preview it, then download it.
@@ -211,6 +401,25 @@ Text cells beginning with `=`, `+`, `-` or `@` are prefixed with `'` in CSV and 
 block spreadsheet formula injection. The builder uses GET parameters, so a report's URL can be
 bookmarked and the downloads always match the preview.
 
+### User interface
+
+The shared layout (`app/templates/base.html`) has a collapsible sidebar grouped by task, a top
+bar with the alerts bell, theme switch and user menu, and a separate public layout for the
+landing and sign-in pages.
+
+- **Light and dark themes.** The first visit follows the operating system's setting, and the
+  choice is remembered in the browser. Colours are defined once as CSS variables in
+  `app/static/css/app.css`; charts and maps restyle themselves when the theme changes
+  (`app/static/js/app.js`).
+- **Responsive.** On small screens the sidebar becomes a slide-out menu.
+- **Maps** use OpenStreetMap tiles (no API key). In dark mode only the base map is darkened, so
+  vehicle markers keep their status colours.
+- **Live motion.** Simulated vehicles drive along real road geometry, and the browser animates
+  each marker smoothly between updates.
+
+Screenshots can be regenerated with `python -m scripts.screenshots` (uses Playwright with the
+installed Google Chrome).
+
 ## Data sources
 
 Both datasets are real and rebuilt from their official sources by scripts in `scripts/`.
@@ -225,77 +434,51 @@ The PDF font (DejaVu Sans, `app/static/fonts/`) is redistributed under its free 
 included alongside it.
 
 Each script prints a cleaning report: duplicates, invalid coordinates or measurements, and
-normalised connector types. The original submission's datasets (a synthetic battery sheet and an
-unofficial station list) are kept in `legacy/datasets/` for reference.
+normalised connector types. These replace the datasets of the first version (a synthetic battery
+sheet and an unofficial station list), which is available in the first commit of the history.
 
-## User interface
-
-The interface uses a shared layout (`app/templates/base.html`): a collapsible sidebar grouped by
-task (Monitor, Analyse, Plan, Admin), a top bar with the alerts bell, theme switch and user menu,
-and a public landing page with sign-up and log-in.
-
-- **Light and dark themes.** The first visit follows the operating system's setting, and the toggle
-  remembers the choice in the browser. Colours are defined once as CSS variables in
-  `app/static/css/app.css`. Charts (Chart.js) and maps (Leaflet) restyle themselves when the theme
-  changes (`app/static/js/app.js`).
-- **Responsive.** On phones the sidebar becomes a slide-out menu.
-- **Maps** use OpenStreetMap tiles (no API key). In dark mode only the base map is darkened, so
-  the vehicle markers keep their status colours.
-- **Live map motion.** Vehicles drive along real road geometry (`data/sim_routes.json`, built from
-  OSRM by `scripts/build_sim_routes.py`). The browser animates each marker smoothly between the
-  5-second updates.
-
-Screenshots of every page in both themes can be regenerated with Playwright, which uses the
-installed Google Chrome:
-
-```powershell
-python -m scripts.screenshots --out docs/screenshots
-```
-
-## Project layout
+## Project structure
 
 ```
-app/            Flask application (app factory, blueprints, templates, static files)
-  config.py     settings per environment, read from environment variables
-  extensions.py database, migrations, login and CSRF extensions
-  models/       database tables (SQLAlchemy)
-  auth/         sign-up, email verification, login/logout, password reset, profile, roles
-  admin/        user management and system settings for administrators
-  vehicles/     EV registration, details, service history, device API keys
-  monitoring/   live fleet map and its JSON feed
-  routing/      route planner page
-  battery/      battery health page (ML checks, alerts)
-  drivers/      driver behaviour leaderboard and scorecards
-  alerts/       alerts inbox (acknowledge, resolve, history)
-  analytics/    energy and cost analysis
-  reports/      report builder and downloads
-  api/          versioned JSON API (/api/v1): telemetry ingest, battery prediction
-  services/     email, telemetry, simulator, alerts, routing, battery model, driving,
-                maintenance rules, notifications, background jobs, energy roll-up, settings,
-                report definitions and exporters (CSV/Excel/PDF)
-  main/         landing page, overview dashboard and /healthz endpoint
-  static/       shared CSS (design tokens, light/dark) and JS (theme, charts, map tiles)
-  cli.py        create-admin, set-role, send-test-email, seed-vehicles, simulate,
-                prune-telemetry, check-maintenance, send-alert-emails, rollup-energy
-migrations/     database schema versions (Alembic via Flask-Migrate)
-scripts/        rebuild datasets from their official sources; page screenshots
-ml/             model training script and model card
-models/         trained model + metadata (committed, so the app works without retraining)
-data/           datasets used by the app
-legacy/         original submission, kept for reference until each module is rebuilt
-tests/          pytest test suite
-wsgi.py         entry point for `flask run` and gunicorn
+app/                  Flask application
+  __init__.py         application factory
+  config.py           settings per environment, read from environment variables
+  models/             database tables (SQLAlchemy)
+  auth/ admin/        accounts, roles, user management, settings
+  vehicles/ monitoring/ routing/ battery/ drivers/ alerts/ analytics/ reports/
+                      one blueprint per feature area
+  api/                JSON API (/api/v1)
+  services/           business logic shared by pages, API, CLI and background jobs
+  templates/ static/  Jinja templates, CSS, JavaScript, fonts
+  cli.py              flask commands (create-admin, bootstrap, seed-vehicles, simulate, ...)
+migrations/           database migrations (Alembic)
+ml/                   model training script and model card
+models/               trained battery model and its metadata
+data/                 cleaned datasets used by the app
+scripts/              rebuild the datasets from their sources; page screenshots
+tests/                pytest suite
+docker/               container entrypoint
+postman/              API collection
+docs/screenshots/     images used in this README
 ```
 
-## Roadmap
+## Design decisions and limitations
 
-| Phase | Scope | Status |
-|---|---|---|
-| 0 | Project foundation: structure, config, base layout, tests | Done |
-| 1 | User authentication, email verification, roles | Done |
-| 2 | EV registration and real-time monitoring | Done |
-| 3 | Route optimisation and battery health (ML) | Done |
-| 4 | Driver behaviour and maintenance alerts | Done |
-| 5 | Energy and cost analysis | Done |
-| 6 | Report generation | Done |
-| 7 | Admin, Docker, CI, deployment | Planned |
+- **Simulated telemetry.** There are no physical vehicles, so a simulator drives demo EVs along
+  real road loops in five Indian cities. Real devices use the same ingest path through the
+  telemetry API, so replacing the simulator needs no changes elsewhere.
+- **In-process background work.** Simple to deploy on a single instance. To scale out, set
+  `SIMULATOR_ENABLED=false` and `BACKGROUND_JOBS_ENABLED=false`, run the equivalent CLI
+  commands from a scheduler or worker, and increase the gunicorn workers.
+- **Polling, not push.** The live map polls a JSON endpoint every 5 seconds. That is enough for
+  this fleet size; WebSockets or server-sent events would suit larger fleets.
+- **Public routing services.** Nominatim's and OSRM's public servers have usage limits; point
+  `NOMINATIM_URL` and `OSRM_URL` at self-hosted instances for production traffic.
+- **Battery model scope.** The SoH model is trained on laboratory cell data. It demonstrates the
+  method with honest error estimates, but a production model would need pack-level data from
+  the fleet's own vehicles. See [`ml/MODEL_CARD.md`](ml/MODEL_CARD.md).
+
+## License
+
+Released under the [MIT License](LICENSE). The charging-station and battery datasets remain
+subject to their publishers' terms, and the bundled DejaVu fonts to their own licence.

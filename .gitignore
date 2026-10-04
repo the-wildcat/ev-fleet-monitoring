@@ -27,3 +27,6 @@ htmlcov/
 Thumbs.db
 .DS_Store
 data/raw/
+
+# Node tooling (e.g. Newman)
+node_modules/

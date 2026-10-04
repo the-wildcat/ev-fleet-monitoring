@@ -30,6 +30,10 @@ def create_app(config_name: str | None = None) -> Flask:
     if config_name == "production" and app.config["SECRET_KEY"] in _PLACEHOLDER_KEYS:
         raise RuntimeError("SECRET_KEY is still a placeholder; set a real secret in production")
 
+    if app.config.get("PROXY_FIX"):
+        from werkzeug.middleware.proxy_fix import ProxyFix
+
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
     os.makedirs(app.instance_path, exist_ok=True)
     _configure_logging(app)
 

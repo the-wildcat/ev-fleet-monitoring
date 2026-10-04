@@ -1,0 +1,40 @@
+# Production-like local stack: the app container plus PostgreSQL.
+#   docker compose up --build    then open http://localhost:8000
+# Values come from your shell or a .env file next to this file; the defaults are for local use only.
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ev_fleet
+      POSTGRES_USER: ev_fleet
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ev_fleet_local}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ev_fleet -d ev_fleet"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  web:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://ev_fleet:${POSTGRES_PASSWORD:-ev_fleet_local}@db:5432/ev_fleet
+      SECRET_KEY: ${SECRET_KEY:-local-compose-secret-not-for-production}
+      APP_BASE_URL: http://localhost:8000
+      # Plain http on localhost; real deployments sit behind HTTPS and keep the default (true).
+      SESSION_COOKIE_SECURE: "false"
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-ChangeMe123}
+      SEED_DEMO_DATA: "true"
+      MAIL_SERVER: ${MAIL_SERVER:-}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+
+volumes:
+  pgdata:

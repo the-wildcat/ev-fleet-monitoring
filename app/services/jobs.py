@@ -2,10 +2,12 @@
 
 A daemon thread wakes every minute and
   * runs the maintenance rules every MAINTENANCE_CHECK_MINUTES,
-  * refreshes the daily energy roll-up every ENERGY_ROLLUP_MINUTES,
+  * refreshes the daily energy roll-up every ENERGY_ROLLUP_MINUTES, then deletes telemetry
+    older than TELEMETRY_RETENTION_DAYS (the daily totals are kept),
   * sends any pending critical-alert emails.
 For larger deployments the same functions can be run by an external scheduler instead
-(`flask check-maintenance`, `flask rollup-energy`, `flask send-alert-emails`) with
+(`flask check-maintenance`, `flask rollup-energy`, `flask prune-telemetry`,
+`flask send-alert-emails`) with
 BACKGROUND_JOBS_ENABLED=false.
 """
 
@@ -25,11 +27,16 @@ def run_once(app: Flask, run_maintenance: bool, run_rollup: bool = False) -> Non
     from app.services.energy import rollup_recent
     from app.services.maintenance import run_maintenance_checks
     from app.services.notifications import send_pending_alert_emails
+    from app.services.telemetry import prune_old_telemetry
 
     # A request context gives url_for() the site address for links in emails.
     with app.test_request_context(base_url=app.config["APP_BASE_URL"]):
         if run_rollup:
             app.logger.info("Energy roll-up updated %d vehicle-days", rollup_recent())
+            removed = prune_old_telemetry(app.config["TELEMETRY_RETENTION_DAYS"])
+            db.session.commit()
+            if removed:
+                app.logger.info("Pruned %d telemetry readings past retention", removed)
         if run_maintenance:
             checked = run_maintenance_checks()
             app.logger.info("Maintenance rules checked for %d vehicles", checked)

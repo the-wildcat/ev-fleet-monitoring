@@ -1,13 +1,13 @@
 [project]
 name = "ev-fleet-monitoring"
-version = "0.1.0"
+version = "1.0.0"
 description = "Real-Time EV Fleet Monitoring and Predictive Analytics Solution"
 requires-python = ">=3.11"
 
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-extend-exclude = ["legacy", "migrations"]
+extend-exclude = ["migrations"]
 
 [tool.ruff.lint]
 # E/F: errors, I: import order, B: likely bugs, UP: modern syntax, SIM: simplifications
@@ -21,3 +21,6 @@ addopts = "-q"
 
 [tool.coverage.run]
 source = ["app"]
+
+[tool.coverage.report]
+fail_under = 90

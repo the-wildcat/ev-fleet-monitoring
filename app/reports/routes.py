@@ -24,7 +24,7 @@ from app.vehicles.access import visible_vehicles_stmt
 
 PREVIEW_ROWS = 100
 FORMATS = {
-    "csv": ("text/csv; charset=utf-8", "csv"),
+    "csv": ("text/csv", "csv"),
     "xlsx": ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "xlsx"),
     "pdf": ("application/pdf", "pdf"),
 }

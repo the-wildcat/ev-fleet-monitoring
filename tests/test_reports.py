@@ -106,7 +106,7 @@ def test_column_and_vehicle_selection(client, manager, fleet):
 
 def test_csv_download(client, manager, fleet):
     resp = _get(client, "/reports/download/csv", type="energy_daily")
-    assert resp.status_code == 200 and resp.mimetype == "text/csv"
+    assert resp.status_code == 200 and resp.content_type == "text/csv; charset=utf-8"
     assert "attachment;" in resp.headers["Content-Disposition"]
     assert resp.data.startswith(b"\xef\xbb\xbf")  # UTF-8 BOM for Excel
     rows = list(csv.reader(io.StringIO(resp.data.decode("utf-8-sig"))))

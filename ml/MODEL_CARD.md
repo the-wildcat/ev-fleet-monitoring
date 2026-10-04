@@ -79,7 +79,7 @@ ambient temperature (0.71), peak temperature (0.26), cycle count (0.25), dischar
   within the training ranges listed above.
 
 ## History
-The original project used a 100-row synthetic spreadsheet (now in `legacy/datasets/`). Its
+The first version of the project used a 100-row synthetic spreadsheet. Its
 health column was an exact formula, `capacity / 40 − cycles / 75`, and it used current
 capacity as an input, which is the quantity SoH is computed from, so any model scored perfectly.
 Replacing it with real data gives honest, realistic accuracy.

@@ -283,3 +283,16 @@ def test_cli_and_background_rollup(app, make_vehicle):
     db.session.commit()
     run_once(app, run_maintenance=False, run_rollup=True)
     assert db.session.query(DailyEnergy).count() == 1
+
+
+def test_background_rollup_prunes_old_telemetry(app, make_vehicle):
+    from app.services.jobs import run_once
+    from app.utils import utcnow
+
+    vehicle, _ = make_vehicle()
+    retention = app.config["TELEMETRY_RETENTION_DAYS"]
+    reading(vehicle, utcnow() - timedelta(days=retention + 1), 80, 0)
+    reading(vehicle, utcnow() - timedelta(minutes=1), 70, 5)
+    db.session.commit()
+    run_once(app, run_maintenance=False, run_rollup=True)
+    assert db.session.query(Telemetry).count() == 1

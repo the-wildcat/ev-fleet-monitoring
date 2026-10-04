@@ -30,7 +30,7 @@ PAGES = [  # (file name, path, wait for selector)
     ("04-live-map", "/monitoring/live", ".leaflet-marker-pane path, .leaflet-interactive"),
     ("05-vehicles", "/vehicles/", None),
     ("06-vehicle-detail", "/vehicles/1", "canvas"),
-    ("07-route-planner", "/routes/plan?demo=1", None),
+    ("07-route-planner", "/routes/plan", None),
     ("08-battery-health", "/battery/", None),
     ("09-driver-behaviour", "/drivers/?days=1", "canvas"),
     ("10-alerts", "/alerts/", None),
@@ -75,6 +75,16 @@ def prepare(env: dict) -> None:
         stderr=subprocess.DEVNULL,
     )
     flask(env, "seed-vehicles", "--count", "8")
+
+
+def plan_demo_route(page) -> None:
+    """Fill in the route planner so the screenshot shows a route with charging stops."""
+    page.fill("#origin", "New Delhi")
+    page.fill("#destination", "Jaipur")
+    page.fill("#start_soc_pct", "35")
+    with page.expect_navigation(timeout=60_000):
+        page.click("#submit")
+    page.wait_for_selector(".leaflet-interactive", timeout=30_000)
 
 
 def main() -> None:
@@ -133,6 +143,8 @@ def main() -> None:
                     for name, path, wait_for in PAGES[2:]:
                         page.goto(BASE + path)
                         page.wait_for_load_state("networkidle")
+                        if name == "07-route-planner":
+                            plan_demo_route(page)
                         if wait_for:
                             page.wait_for_selector(wait_for, timeout=15000)
                         page.wait_for_timeout(1200)  # chart animations / map tiles

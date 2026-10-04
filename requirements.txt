@@ -7,6 +7,8 @@ Flask-WTF==1.3.0
 email-validator==2.3.0
 python-dotenv==1.2.4
 gunicorn==26.2.0
+# PostgreSQL driver (production database)
+psycopg[binary]==3.3.6
 # Data, ML model serving and routing HTTP calls
 numpy==2.5.3
 pandas==3.0.6

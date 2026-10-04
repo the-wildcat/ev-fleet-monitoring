@@ -1,0 +1,394 @@
+{
+  "info": {
+    "name": "EV Fleet Monitoring API",
+    "description": "JSON API of the EV Fleet Monitoring app (`/api/v1`).\n\nSet the `baseUrl` variable (e.g. http://127.0.0.1:5000 or your deployed URL) and, for telemetry, `apiKey`: a vehicle's device key, shown once when the vehicle is registered or its key is rotated (Vehicles → vehicle → Rotate API key).\n\nEvery request has tests, so the collection can run in Postman's Collection Runner or headless with Newman.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:5000"
+    },
+    {
+      "key": "apiKey",
+      "value": "evk_replace_with_a_vehicle_key"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/healthz",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "healthz"
+              ]
+            },
+            "description": "Liveness and database connectivity."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('database reachable', () => pm.expect(pm.response.json().database).to.eql('ok'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Battery health prediction",
+      "item": [
+        {
+          "name": "Predict state of health",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/predict/battery",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "predict",
+                "battery"
+              ]
+            },
+            "description": "Predicts battery state of health (%) from cell measurements. No authentication: the endpoint is stateless and stores nothing.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cycle_count\": 100,\n  \"ambient_temperature_c\": 24,\n  \"discharge_current_a\": 2.0,\n  \"avg_voltage_v\": 3.52,\n  \"max_temperature_c\": 41.0,\n  \"internal_resistance_mohm\": 131.6\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json().predictions[0];",
+                  "pm.test('SoH between 0 and 120', () => pm.expect(p.soh_pct).to.be.within(0, 120));",
+                  "pm.test('status band', () => pm.expect(['Good', 'Fair', 'Needs Replacement']).to.include(p.status));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Predict (batch)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/predict/battery",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "predict",
+                "battery"
+              ]
+            },
+            "description": "Up to 100 inputs in one call.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"inputs\": [\n    {\n      \"cycle_count\": 100,\n      \"ambient_temperature_c\": 24,\n      \"discharge_current_a\": 2.0,\n      \"avg_voltage_v\": 3.52,\n      \"max_temperature_c\": 41.0,\n      \"internal_resistance_mohm\": 131.6\n    },\n    {\n      \"cycle_count\": 160,\n      \"ambient_temperature_c\": 24,\n      \"discharge_current_a\": 2.0,\n      \"avg_voltage_v\": 3.52,\n      \"max_temperature_c\": 41.0,\n      \"internal_resistance_mohm\": 160.0\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('one prediction per input', () => pm.expect(pm.response.json().predictions).to.have.lengthOf(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Predict with invalid input",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/predict/battery",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "predict",
+                "battery"
+              ]
+            },
+            "description": "Validation errors are returned per input and field.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cycle_count\": 100,\n  \"ambient_temperature_c\": 24,\n  \"discharge_current_a\": 2.0,\n  \"avg_voltage_v\": \"high\",\n  \"max_temperature_c\": 41.0,\n  \"internal_resistance_mohm\": 131.6\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('field error reported', () => pm.expect(pm.response.json().details[0].errors).to.have.property('avg_voltage_v'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Telemetry ingest",
+      "item": [
+        {
+          "name": "Send one reading",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/telemetry",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "telemetry"
+              ]
+            },
+            "description": "Required: lat, lon, speed_kmh, soc_pct. Optional: is_charging, battery_temp_c, odometer_km, acceleration_mps2, power_kw, recorded_at (ISO 8601, defaults to now).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lat\": 12.9716,\n  \"lon\": 77.5946,\n  \"speed_kmh\": 42.5,\n  \"soc_pct\": 76.2,\n  \"is_charging\": false,\n  \"battery_temp_c\": 31.4,\n  \"odometer_km\": 15234.7\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('reading accepted', () => pm.expect(pm.response.json().accepted).to.eql(1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Send a batch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/telemetry",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "telemetry"
+              ]
+            },
+            "description": "Up to 100 buffered readings; a batch is stored all-or-nothing.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"readings\": [\n    {\n      \"lat\": 12.9716,\n      \"lon\": 77.5946,\n      \"speed_kmh\": 42.5,\n      \"soc_pct\": 76.2,\n      \"is_charging\": false,\n      \"battery_temp_c\": 31.4,\n      \"odometer_km\": 15234.7\n    },\n    {\n      \"lat\": 12.9725,\n      \"lon\": 77.5946,\n      \"speed_kmh\": 38.0,\n      \"soc_pct\": 76.0,\n      \"is_charging\": false,\n      \"battery_temp_c\": 31.4,\n      \"odometer_km\": 15235.1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('both readings accepted', () => pm.expect(pm.response.json().accepted).to.eql(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject a missing API key",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/telemetry",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "telemetry"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lat\": 12.9716,\n  \"lon\": 77.5946,\n  \"speed_kmh\": 42.5,\n  \"soc_pct\": 76.2,\n  \"is_charging\": false,\n  \"battery_temp_c\": 31.4,\n  \"odometer_km\": 15234.7\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject an invalid reading",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/telemetry",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "telemetry"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lat\": 12.9716,\n  \"lon\": 77.5946,\n  \"speed_kmh\": 42.5,\n  \"soc_pct\": 140,\n  \"is_charging\": false,\n  \"battery_temp_c\": 31.4,\n  \"odometer_km\": 15234.7\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('soc_pct error reported', () => pm.expect(pm.response.json().details[0].errors).to.have.property('soc_pct'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
